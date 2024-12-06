@@ -36,6 +36,7 @@
 #include <string.h>
 
 #include <math.h>
+#include "serialize_library.h"
 
 /*
 ** global data
@@ -303,6 +304,7 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
     switch (CommandCode)
     {
         case GATEWAY_APP_NOOP_CC:
+            printf("Noop...\n");
             if (GatewayAppVerifyCmdLength(&SBBufPtr->Msg, sizeof(GatewayAppNoopCmd_t)))
             {
                 GatewayAppNoop((GatewayAppNoopCmd_t *)SBBufPtr);
@@ -311,10 +313,22 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
             break;
 
         case GATEWAY_APP_SET_TWIST_CC:
-            if (GatewayAppVerifyCmdLength(&SBBufPtr->Msg, sizeof(GatewayAppTwistCmd_t)))
-            {
-                GatewayAppCmdTwist((GatewayAppTwistCmd_t *)SBBufPtr);
-            }
+            printf("Twist....\n");
+            //if (GatewayAppVerifyCmdLength(&SBBufPtr->Msg, sizeof(GatewayAppTwistCmd_t)))
+            //{
+              // Let's see if we can deserialize
+              
+  // You know the first 8 bytes are the header
+  size_t offset = 0;
+  unsigned char header[8];
+  memcpy(&header, SBBufPtr + offset, sizeof(header));
+  printf("Deserializing: header: %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x \n", header[0], header[1], header[2], header[3], header[4], header[5], header[6], header[7]);
+  offset = offset + sizeof(header);
+              struct Data* data2 = deserialize((unsigned char*)SBBufPtr, 56 - sizeof(header), offset);
+              printf("After deserializing: data2: age: %d first name: %s last name: %s \n", data2->age, data2->first_name, data2->last_name);    
+
+                //GatewayAppCmdTwist((GatewayAppTwistCmd_t *)SBBufPtr);
+            //}
 
             break;
 
