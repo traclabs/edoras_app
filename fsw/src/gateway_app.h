@@ -42,8 +42,6 @@
 #include "gateway_app_msgids.h"
 #include "gateway_app_msg.h"
 
-// #include "gateway_app_msgids.h"
-
 /***********************************************************************/
 #define GATEWAY_APP_PIPE_DEPTH 32 /* Depth of the Command Pipe for Application */
 /************************************************************************

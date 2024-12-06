@@ -36,13 +36,21 @@
 #include <string.h>
 
 #include <math.h>
+
 #include "serialize_library.h"
+#include "robot_comm_udp_test.h"
+
+#define ROBOT_PORT 8585
+#define CFS_PORT 8080
+
 
 /*
 ** global data
 */
 GatewayAppData_t GatewayAppData;
 GatewayAppOdometry_t lastOdomMsg;
+
+CommData_t commData;
 
 void HighRateControLoop(void);
 
@@ -71,6 +79,12 @@ void GatewayAppMain(void)
     {
         GatewayAppData.RunStatus = CFE_ES_RunStatus_APP_ERROR;
     }
+ 
+    // Start comm
+    if(!setupComm(&commData, CFS_PORT, ROBOT_PORT))
+    {
+       perror("Error setting up communication to the robot using sockets");
+    }
 
     /*
     ** Runloop
@@ -81,6 +95,17 @@ void GatewayAppMain(void)
         ** Performance Log Exit Stamp
         */
         CFE_ES_PerfLogExit(GATEWAY_APP_PERF_ID);
+
+        /**
+         * Check if we receive telemetry data from robot on flight side
+         */
+        double joint_state[7];
+        if(receiveJointState(&commData, joint_state))
+        {
+           printf("** Received joint state!: %f %f %f %f %f %f %f \n",
+           joint_state[0], joint_state[1], joint_state[2], joint_state[3],
+           joint_state[4], joint_state[5], joint_state[6]);
+        } 
 
         /* Pend on receipt of command packet */
         status = CFE_SB_ReceiveBuffer(&SBBufPtr, GatewayAppData.CommandPipe, CFE_SB_PEND_FOREVER);
