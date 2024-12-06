@@ -78,8 +78,8 @@ typedef struct
 
 typedef struct
 {
-   CFE_MSG_CommandHeader_t CmdHeader;
-   GatewayAppTwist_t twist;
+   CFE_MSG_CommandHeader_t CmdHeader; // 8
+   GatewayAppTwist_t twist; // 6 floats = 6x4 = 24
 } GatewayAppTwistCmd_t;
 
 /*

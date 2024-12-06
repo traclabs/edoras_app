@@ -75,7 +75,7 @@ void GatewayAppMain(void)
     ** Runloop
     */
     while (CFE_ES_RunLoop(&GatewayAppData.RunStatus) == true)
-    {
+    {   printf("Loop is running in Gateway ----------------------- \n");
         /*
         ** Performance Log Exit Stamp
         */
@@ -91,7 +91,7 @@ void GatewayAppMain(void)
         else
         {
             CFE_EVS_SendEvent(GATEWAY_APP_PIPE_ERR_EID, CFE_EVS_EventType_ERROR,
-                              "Rover App: SB Pipe Read Error, App Will Exit");
+                              "Edoras App: SB Pipe Read Error, App Will Exit");
 
             GatewayAppData.RunStatus = CFE_ES_RunStatus_APP_ERROR;
         }
@@ -101,7 +101,7 @@ void GatewayAppMain(void)
         */
         CFE_ES_PerfLogEntry(GATEWAY_APP_PERF_ID);
     }
-
+    printf("GATEWAY Loop was ended **************************** \n");
     /*
     ** Performance Log Exit Stamp
     */
@@ -184,7 +184,7 @@ int32 GatewayAppInit(void)
     status = CFE_SB_CreatePipe(&GatewayAppData.CommandPipe, GatewayAppData.PipeDepth, GatewayAppData.PipeName);
     if (status != CFE_SUCCESS)
     {
-        CFE_ES_WriteToSysLog("Rover App: Error creating pipe, RC = 0x%08lX\n", (unsigned long)status);
+        CFE_ES_WriteToSysLog("Edoras App: Error creating pipe, RC = 0x%08lX\n", (unsigned long)status);
         return (status);
     }
 
@@ -194,7 +194,7 @@ int32 GatewayAppInit(void)
     status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(GATEWAY_APP_SEND_HK_MID), GatewayAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
-        CFE_ES_WriteToSysLog("Rover App: Error Subscribing to HK request, RC = 0x%08lX\n", (unsigned long)status);
+        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to HK request, RC = 0x%08lX\n", (unsigned long)status);
         return (status);
     }
 
@@ -204,7 +204,7 @@ int32 GatewayAppInit(void)
     status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(GATEWAY_APP_CMD_MID), GatewayAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
-        CFE_ES_WriteToSysLog("Rover App: Error Subscribing to Command, RC = 0x%08lX\n", (unsigned long)status);
+        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Command, RC = 0x%08lX\n", (unsigned long)status);
 
         return (status);
     }
@@ -216,7 +216,7 @@ int32 GatewayAppInit(void)
     status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(GATEWAY_APP_CMD_ODOM_MID), GatewayAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
-        CFE_ES_WriteToSysLog("Rover App: Error Subscribing to Odom data, RC = 0x%08lX\n", (unsigned long)status);
+        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Odom data, RC = 0x%08lX\n", (unsigned long)status);
 
         return (status);
     }
@@ -228,12 +228,12 @@ int32 GatewayAppInit(void)
     status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(GATEWAY_APP_HR_CONTROL_MID), GatewayAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
-        CFE_ES_WriteToSysLog("Rover App: Error Subscribing to HR Wakeup Command, RC = 0x%08lX\n", (unsigned long)status);
+        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to HR Wakeup Command, RC = 0x%08lX\n", (unsigned long)status);
 
         return (status);
     }
 
-    CFE_EVS_SendEvent(GATEWAY_APP_STARTUP_INF_EID, CFE_EVS_EventType_INFORMATION, "Rover App Initialized.%s",
+    CFE_EVS_SendEvent(GATEWAY_APP_STARTUP_INF_EID, CFE_EVS_EventType_INFORMATION, "Edoras App Initialized.%s",
                       GATEWAY_APP_VERSION_STRING);
 
     return (CFE_SUCCESS);
@@ -254,7 +254,7 @@ void GatewayAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
     CFE_SB_MsgId_t MsgId = CFE_SB_INVALID_MSG_ID;
 
     CFE_MSG_GetMsgId(&SBBufPtr->Msg, &MsgId);
-    //printf("GatewayAppProcessCommandPacket() -- we're processing the cmd from MID: 0x%04x\n", CFE_SB_MsgIdToValue(MsgId));
+    printf("GatewayAppProcessCommandPacket() -- we're processing the cmd from MID: 0x%04x\n", CFE_SB_MsgIdToValue(MsgId));
     switch (CFE_SB_MsgIdToValue(MsgId))
     {
         case GATEWAY_APP_CMD_MID:
@@ -275,7 +275,7 @@ void GatewayAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
             
         default:
             CFE_EVS_SendEvent(GATEWAY_APP_INVALID_MSGID_ERR_EID, CFE_EVS_EventType_ERROR,
-                              "rover app: invalid command packet,MID = 0x%x", (unsigned int)CFE_SB_MsgIdToValue(MsgId));
+                              "Edoras App: invalid command packet,MID = 0x%x", (unsigned int)CFE_SB_MsgIdToValue(MsgId));
             break;
     }
 
@@ -286,7 +286,7 @@ void GatewayAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
 /*                                                                            */
-/* GatewayAppProcessGroundCommand() -- rover app ground commands                */
+/* GatewayAppProcessGroundCommand() -- Edoras App ground commands                */
 /*                                                                            */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
 void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
@@ -298,7 +298,7 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
     printf("GatewayAppProcessGroundCommand() -- we're getting a ground command...%d\n", CommandCode);
 
     /*
-    ** Process "known" rover app ground commands
+    ** Process "known" Edoras App ground commands
     */
     switch (CommandCode)
     {
@@ -332,7 +332,7 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
 /*                                                                            */
-/* GatewayAppProcessFlightOdom() -- rover app flight odometry                   */
+/* GatewayAppProcessFlightOdom() -- Edoras App flight odometry                   */
 /*                                                                            */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
 void GatewayAppProcessFlightOdom(CFE_SB_Buffer_t *SBBufPtr)
@@ -396,7 +396,7 @@ int32 GatewayAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
 int32 GatewayAppNoop(const GatewayAppNoopCmd_t *Msg)
 {
-    CFE_EVS_SendEvent(GATEWAY_APP_COMMANDNOP_INF_EID, CFE_EVS_EventType_INFORMATION, "rover app: NOOP command %s",
+    CFE_EVS_SendEvent(GATEWAY_APP_COMMANDNOP_INF_EID, CFE_EVS_EventType_INFORMATION, "Edoras App: NOOP command %s",
                       GATEWAY_APP_VERSION);
 
     return CFE_SUCCESS;
@@ -413,7 +413,7 @@ int32 GatewayAppCmdTwist(const GatewayAppTwistCmd_t *Msg)
     GatewayAppData.LastTwist.twist.angular_z = Msg->twist.angular_z;
 
 
-    CFE_EVS_SendEvent(GATEWAY_APP_COMMANDTWIST_INF_EID, CFE_EVS_EventType_INFORMATION, "rover app: twist command %s",
+    CFE_EVS_SendEvent(GATEWAY_APP_COMMANDTWIST_INF_EID, CFE_EVS_EventType_INFORMATION, "Edoras App: twist command %s",
                       GATEWAY_APP_VERSION);
 
     return CFE_SUCCESS;
