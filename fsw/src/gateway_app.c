@@ -347,14 +347,18 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
   size_t offset = 0;
   unsigned char header[8];
   memcpy(&header, SBBufPtr + offset, sizeof(header));
-  printf("Deserializing: header: %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x \n", header[0], header[1], header[2], header[3], header[4], header[5], header[6], header[7]);
-  offset = offset + sizeof(header);
+  printf("Got command data!: Deserializing: header :D :D :D: %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x \n", header[0], header[1], header[2], header[3], header[4], header[5], header[6], header[7]);
+  
+    size_t actual_length = 0;
+    CFE_MSG_GetSize(&SBBufPtr->Msg, &actual_length);
+    printf("******************************** Actual length of command: %ld. Minus header: %ld \n", actual_length, actual_length - 8);
+ /* offset = offset + sizeof(header);
               struct Data* data2 = deserialize((unsigned char*)SBBufPtr, 56 - sizeof(header), offset);
               printf("After deserializing: data2: age: %d first name: %s last name: %s \n", data2->age, data2->first_name, data2->last_name);    
 
                 //GatewayAppCmdTwist((GatewayAppTwistCmd_t *)SBBufPtr);
             //}
-
+*/
             break;
 
         /* default case already found during FC vs length test */

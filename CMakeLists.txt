@@ -9,9 +9,11 @@ link_directories(/home/ana/ros2/edoras_ws/edoras/src/scratch/c_serialize_udp/bui
 # Create library for talking to robot using sockets
 add_library(robot_comm_udp_test fsw/src/robot_comm_udp_test.c)
 
+add_subdirectory(fsw/edoras_conversion)
+
 # Create the app module
 add_cfe_app(gateway_app fsw/src/gateway_app.c)
-target_link_libraries(gateway_app m serialize_library robot_comm_udp_test)
+target_link_libraries(gateway_app m serialize_library robot_comm_udp_test edoras_conversion)
 
 target_include_directories(gateway_app PUBLIC
   fsw/mission_inc
