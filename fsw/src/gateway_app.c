@@ -37,8 +37,12 @@
 
 #include <math.h>
 
+#include "debug_utils_c_version.h"
+
+
 #include "serialize_library.h"
 #include "robot_comm_udp_test.h"
+
 
 #define ROBOT_PORT 8585
 #define CFS_PORT 8080
@@ -352,6 +356,7 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
     size_t actual_length = 0;
     CFE_MSG_GetSize(&SBBufPtr->Msg, &actual_length);
     printf("******************************** Actual length of command: %ld. Minus header: %ld \n", actual_length, actual_length - 8);
+    
  /* offset = offset + sizeof(header);
               struct Data* data2 = deserialize((unsigned char*)SBBufPtr, 56 - sizeof(header), offset);
               printf("After deserializing: data2: age: %d first name: %s last name: %s \n", data2->age, data2->first_name, data2->last_name);    
@@ -359,7 +364,11 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
                 //GatewayAppCmdTwist((GatewayAppTwistCmd_t *)SBBufPtr);
             //}
 */
-            break;
+        //    testing(3);
+        const TypeInfo_t * ti; 
+        //ti = get_type_info("geometry_msgs", 
+        //                   "Pose");
+             break;
 
         /* default case already found during FC vs length test */
         default:

@@ -1,9 +1,14 @@
-#pragma once
+#ifndef __DEBUG_UTILS_C_VERSION__
+#define __DEBUG_UTILS_C_VERSION__
 
 
 #include "types.h"
 #include <string.h>
 
+extern void testing(int a);
+const TypeInfo_t * get_type_info(const char* _interface_name, 
+                                 const char* _interface_type);
+                                 
 void debug_parse_message(uint8_t* _data_buffer, const TypeInfo_t *_type_info);
 void debug_parse_member(MemberInfo_t _member_info, uint8_t * _member_data);
 void debug_parse_basic_value(MemberInfo_t _member_info, const uint8_t * _member_data);
@@ -29,3 +34,5 @@ dynamic_array_to_yaml_impl(MemberInfo_t _member_info, T * _array)
 
 
 size_t size_of_member_type(uint8_t type_id);
+
+#endif /** __DEBUG_UTILS_C_VERSION__ */

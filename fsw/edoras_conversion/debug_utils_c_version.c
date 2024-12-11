@@ -1,8 +1,61 @@
 
-#include "debug_utils_c_version.h"
 #include <rosidl_typesupport_introspection_c/field_types.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <dlfcn.h>
+
+
+#include "debug_utils_c_version.h"
+
+void testing(int a) { printf("A: %d \n", a);}
+
+/**
+ * @function get_type_info
+ */
+const TypeInfo_t * get_type_info(const char* _interface_name, 
+                                 const char* _interface_type)
+{
+  // Load the introspection library for the package containing the requested type
+  const char* tic = "__rosidl_typesupport_introspection_c.so";
+  char *ts_lib_name = malloc( strlen("lib") + strlen(_interface_name) + strlen(tic) );
+  strcpy(ts_lib_name, "lib");
+  strcpy(ts_lib_name, _interface_name);
+  strcpy(ts_lib_name, tic);
+
+  void * introspection_type_support_lib = dlopen(ts_lib_name, RTLD_LAZY);
+  if (introspection_type_support_lib == NULL) {
+    //_error_msg = "Failed to load introspection type support library: " + std::string(dlerror());
+    return NULL;
+  }
+  
+  // Load the function that, when called, will give us the introspection information for the
+  // interface type we are interested in
+  const char* tsh = "rosidl_typesupport_introspection_c__get_message_type_support_handle__";
+  char* ts_func_name = malloc( strlen(tsh) + strlen(_interface_name) + strlen("__msg__") + strlen(_interface_type) );
+  strcpy(ts_func_name, tsh );
+  strcpy(ts_func_name, _interface_name);
+  strcpy(ts_func_name, "__msg__");
+  strcpy(ts_func_name, _interface_type);
+
+  const rosidl_message_type_support_t * (*introspection_type_support_handle_func)(void);
+  introspection_type_support_handle_func =  dlsym(
+      introspection_type_support_lib,
+      ts_func_name );
+  if (introspection_type_support_handle_func == NULL) {
+    //_error_msg = "failed to load introspection type support function: " + std::string(dlerror());
+    return NULL;
+  }
+
+  // Call the function to get the introspection information we want
+  const rosidl_message_type_support_t * introspection_ts =
+    introspection_type_support_handle_func();
+
+  const rosidl_typesupport_introspection_c__MessageMembers * type_info =
+    (const rosidl_typesupport_introspection_c__MessageMembers *) (
+    introspection_ts->data);
+
+  return type_info;
+}
 
 void debug_parse_message(uint8_t* _data_buffer, const TypeInfo_t *_type_info)
 { 
