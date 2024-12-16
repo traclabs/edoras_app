@@ -43,6 +43,7 @@
 #include "serialize_library.h"
 #include "robot_comm_udp_test.h"
 
+#include <edoras_parsing/interface.h>
 
 #define ROBOT_PORT 8585
 #define CFS_PORT 8080
@@ -342,6 +343,7 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
             break;
 
         case GATEWAY_APP_SET_TWIST_CC:
+        {
             printf("Twist....\n");
             //if (GatewayAppVerifyCmdLength(&SBBufPtr->Msg, sizeof(GatewayAppTwistCmd_t)))
             //{
@@ -356,7 +358,7 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
     size_t actual_length = 0;
     CFE_MSG_GetSize(&SBBufPtr->Msg, &actual_length);
     printf("******************************** Actual length of command: %ld. Minus header: %ld \n", actual_length, actual_length - 8);
-    
+
  /* offset = offset + sizeof(header);
               struct Data* data2 = deserialize((unsigned char*)SBBufPtr, 56 - sizeof(header), offset);
               printf("After deserializing: data2: age: %d first name: %s last name: %s \n", data2->age, data2->first_name, data2->last_name);    
@@ -366,8 +368,32 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 */
         //    testing(3);
         const TypeInfo_t * ti; 
-        //ti = get_type_info("geometry_msgs", 
-        //                   "Pose");
+        const TypeSupport_t* ts;
+        void* ts_library;
+        ts_library = get_type_support_library("geometry_msgs", "Pose");
+        ti = get_type_info("geometry_msgs", "Pose");
+        printf("Type info for geometry_msgs::Pose has %u members \n", ti->member_count_);
+        printf("Loading type support...\n");
+        ts = get_type_support_2("geometry_msgs", "Pose", ts_library);
+        const char* tpid = ts->typesupport_identifier;
+        printf("Type support identifier in gateway_app: %s \n", tpid);
+        
+        // Parse the information  
+        offset = 8;
+        //uint8_t data_buffer[actual_length - offset];
+        //memcpy(&data_buffer, SBBufPtr + offset, actual_length - offset); 
+        //printf("Coping %ld bytes to data_buffer \n", actual_length - offset);
+        
+        //size_t buffer_length_test;
+        //memcpy(&buffer_length_test, (uint8_t*)SBBufPtr + offset, sizeof(size_t));
+        //printf("Reading raw: buffer length test: %ld \n", buffer_length_test);
+        uint8_t* msg_pointer;
+        offset = 8;
+        size_t buffer_size;
+        msg_pointer = from_uint_buffer_to_msg_pointer( (uint8_t*)SBBufPtr, offset, ts, ti, &buffer_size);
+        printf("Size of msg pointer: %lu \n", sizeof(msg_pointer));
+        debug_parse_buffer(msg_pointer, ti);
+       }
              break;
 
         /* default case already found during FC vs length test */
