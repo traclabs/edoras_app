@@ -4,11 +4,13 @@ include_directories(fsw/mission_inc)
 include_directories(fsw/platform_inc)
 #include_directories(${gateway_app_MISSION_DIR}/fsw/platform_inc) # ros_app?
 
-set(SCRATCH_DIR /home/ana/ros2/edoras_ws/edoras/src/scratch)
+# TODO: Get rid of this, just use another edoras bridge to talk to robot
+set(EDORAS_WS /home/ana/ros2/edoras_ws)
+set(SCRATCH_DIR ${EDORAS_WS}/edoras/src/scratch)
 include_directories(${SCRATCH_DIR}/c_serialize_udp)
 link_directories(${SCRATCH_DIR}/c_serialize_udp/build)
 
-
+# TODO: Get ride of include_dirs for edoras deps, just use target_include_directories in edoras_core
 set( include_deps
  rosidl_typesupport_introspection_c
  rosidl_runtime_c
@@ -16,23 +18,18 @@ set( include_deps
  rosidl_typesupport_interface
 )
 
-set( library_deps
- rosidl_typesupport_introspection_c
- rosidl_runtime_c
- rcutils
-)
-
 set(ROS_ROOT /opt/ros/jazzy)
 foreach(dep ${include_deps})
   list(APPEND DEP_INCLUDE_DIRS "${ROS_ROOT}/include/${dep}")
 endforeach()
 
-set(EDORAS_DIR /home/ana/ros2/edoras_ws/edoras_parsing)
+# Set edoras dependencies
+set(EDORAS_DIR ${EDORAS_WS}/edoras_core)
+
 include_directories(${EDORAS_DIR}/include
  ${DEP_INCLUDE_DIRS})
+ 
 find_library(EDORAS_LIBRARY edoras  HINTS ${EDORAS_DIR}/build ) 
-
-
 
 
 # Create library for talking to robot using sockets

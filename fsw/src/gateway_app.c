@@ -43,7 +43,7 @@
 #include "serialize_library.h"
 #include "robot_comm_udp_test.h"
 
-#include <edoras_parsing/interface.h>
+#include <edoras_core/interface.h>
 
 #define ROBOT_PORT 8585
 #define CFS_PORT 8080
