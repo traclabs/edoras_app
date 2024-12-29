@@ -368,13 +368,15 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 */
         //    testing(3);
         const TypeInfo_t * ti; 
-        const TypeSupport_t* ts;
         void* ts_library;
-        ts_library = get_type_support_library("geometry_msgs", "Pose");
-        ti = get_type_info("geometry_msgs", "Pose");
-        printf("Type info for geometry_msgs::Pose has %u members \n", ti->member_count_);
+        const TypeSupport_t* ts;
+        const char* interface_type = "sensor_msgs"; //"geometry_msgs";
+        const char* interface_name = "JointState";
+        ti = get_type_info(interface_type, interface_name);
+        printf("Type info for %s::%s has %u members \n", interface_type, interface_name, ti->member_count_);
         printf("Loading type support...\n");
-        ts = get_type_support_2("geometry_msgs", "Pose", ts_library);
+        ts_library = get_type_support_library(interface_type, interface_name);
+        ts = get_type_support(interface_type, interface_name, ts_library);
         const char* tpid = ts->typesupport_identifier;
         printf("Type support identifier in gateway_app: %s \n", tpid);
         
@@ -384,15 +386,17 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
         //memcpy(&data_buffer, SBBufPtr + offset, actual_length - offset); 
         //printf("Coping %ld bytes to data_buffer \n", actual_length - offset);
         
-        //size_t buffer_length_test;
-        //memcpy(&buffer_length_test, (uint8_t*)SBBufPtr + offset, sizeof(size_t));
-        //printf("Reading raw: buffer length test: %ld \n", buffer_length_test);
+        size_t buffer_length_test;
+        memcpy(&buffer_length_test, (uint8_t*)SBBufPtr + offset, sizeof(size_t));
+        printf("Reading raw: buffer length test: %ld \n", buffer_length_test);
         uint8_t* msg_pointer;
         offset = 8;
         size_t buffer_size;
         msg_pointer = from_uint_buffer_to_msg_pointer( (uint8_t*)SBBufPtr, offset, ts, ti, &buffer_size);
         printf("Size of msg pointer: %lu \n", sizeof(msg_pointer));
+        printf("Buffer size: %ld\n", buffer_size);
         debug_parse_buffer(msg_pointer, ti);
+        
        }
              break;
 
