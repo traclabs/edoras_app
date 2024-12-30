@@ -1,23 +1,5 @@
 /*******************************************************************************
 **
-**      GSC-18128-1, "Core Flight Executive Version 6.7"
-**
-**      Copyright (c) 2006-2019 United States Government as represented by
-**      the Administrator of the National Aeronautics and Space Administration.
-**      All Rights Reserved.
-**
-**      Licensed under the Apache License, Version 2.0 (the "License");
-**      you may not use this file except in compliance with the License.
-**      You may obtain a copy of the License at
-**
-**        http://www.apache.org/licenses/LICENSE-2.0
-**
-**      Unless required by applicable law or agreed to in writing, software
-**      distributed under the License is distributed on an "AS IS" BASIS,
-**      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-**      See the License for the specific language governing permissions and
-**      limitations under the License.
-**
 ** File: gateway_app.c
 **
 ** Purpose:
@@ -43,8 +25,6 @@
 #include "serialize_library.h"
 #include "robot_comm_udp_test.h"
 
-#include <edoras_core/interface.h>
-
 #define ROBOT_PORT 8585
 #define CFS_PORT 8080
 
@@ -56,6 +36,17 @@ GatewayAppData_t GatewayAppData;
 GatewayAppOdometry_t lastOdomMsg;
 
 CommData_t commData;
+
+ParseData_t parse_pose_;
+ParseData_t parse_twist_;
+
+typedef struct
+{
+    CFE_MSG_TelemetryHeader_t  TlmHeader;
+    uint8_t data[56];
+} PoseData_t;
+
+PoseData_t tlm_pose;
 
 void HighRateControLoop(void);
 
@@ -78,39 +69,26 @@ void GatewayAppMain(void)
     ** If the Initialization fails, set the RunStatus to
     ** CFE_ES_RunStatus_APP_ERROR and the App will not enter the RunLoop
     */
+    // 0: CFE_ES_RunStatus_UNDEFINED, 1: CFE_ES_RunStatus_APP_RUN, 2: CFE_ES_RunStatus_APP_EXIT, 3: CFE_ES_RunStatus_APP_ERROR
     status = GatewayAppInit();
-
     if (status != CFE_SUCCESS)
-    {
+    {   printf("Setting run status to be error !!!!!!XXXXXXXXXXXXX!!!!!!!\n");
         GatewayAppData.RunStatus = CFE_ES_RunStatus_APP_ERROR;
     }
- 
+
     // Start comm
     if(!setupComm(&commData, CFS_PORT, ROBOT_PORT))
     {
        perror("Error setting up communication to the robot using sockets");
     }
 
-    /*
-    ** Runloop
-    */
+    // Run loop
     while (CFE_ES_RunLoop(&GatewayAppData.RunStatus) == true)
     {   printf("Loop is running in Gateway ----------------------- \n");
-        /*
-        ** Performance Log Exit Stamp
-        */
+
+        // Performance Log Exit Stamp
         CFE_ES_PerfLogExit(GATEWAY_APP_PERF_ID);
 
-        /**
-         * Check if we receive telemetry data from robot on flight side
-         */
-        double joint_state[7];
-        if(receiveJointState(&commData, joint_state))
-        {
-           printf("** Received joint state!: %f %f %f %f %f %f %f \n",
-           joint_state[0], joint_state[1], joint_state[2], joint_state[3],
-           joint_state[4], joint_state[5], joint_state[6]);
-        } 
 
         /* Pend on receipt of command packet */
         status = CFE_SB_ReceiveBuffer(&SBBufPtr, GatewayAppData.CommandPipe, CFE_SB_PEND_FOREVER);
@@ -123,7 +101,7 @@ void GatewayAppMain(void)
         {
             CFE_EVS_SendEvent(GATEWAY_APP_PIPE_ERR_EID, CFE_EVS_EventType_ERROR,
                               "Edoras App: SB Pipe Read Error, App Will Exit");
-
+            printf("RUN STATUS APP ERROR!!!!!! ********* !!!!!!!!!!! \n");   
             GatewayAppData.RunStatus = CFE_ES_RunStatus_APP_ERROR;
         }
 
@@ -133,46 +111,57 @@ void GatewayAppMain(void)
         CFE_ES_PerfLogEntry(GATEWAY_APP_PERF_ID);
     }
     printf("GATEWAY Loop was ended **************************** \n");
-    /*
-    ** Performance Log Exit Stamp
-    */
+    // Performance Log Exit Stamp
     CFE_ES_PerfLogExit(GATEWAY_APP_PERF_ID);
 
     CFE_ES_ExitApp(GatewayAppData.RunStatus);
 
 } /* End of GatewayAppMain() */
 
+void initializeParseData(const char* _interface_name, const char* _interface_type, ParseData_t *_parse_data )
+{
+    _parse_data->interface_type = _interface_name;
+    _parse_data->interface_name = _interface_type;
+    _parse_data->ti = get_type_info(_parse_data->interface_type, _parse_data->interface_name);
 
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  */
-/*                                                                            */
-/* GatewayAppInit() --  initialization                                       */
-/*                                                                            */
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
+    _parse_data->ts_library = get_type_support_library(_parse_data->interface_type, _parse_data->interface_name);
+    _parse_data->ts = get_type_support(_parse_data->interface_type, _parse_data->interface_name, _parse_data->ts_library);
+}
+
+size_t getSizeWithTlmHeader(ParseData_t *_parse_data)
+{
+   size_t size_msg = _parse_data->ti->size_of_;
+   size_t size_tlm_hdr = sizeof(CFE_MSG_TelemetryHeader_t);
+   printf("Size msg: %ld size tlm hdr: %ld \n", size_msg, size_tlm_hdr);
+   return size_msg + size_tlm_hdr;
+}
+
+/**
+ * @function GatewayAppInit
+ * @brief Initialize app
+ */
 int32 GatewayAppInit(void)
 {
+    // Init ROS message stuff
+    initializeParseData("geometry_msgs", "Pose", &parse_pose_);
+    initializeParseData("geometry_msgs", "Twist", &parse_twist_);
+
     int32 status;
 
     GatewayAppData.RunStatus = CFE_ES_RunStatus_APP_RUN;
+        printf("Debug 1.5.b . Run Status: %d (undefined: %d run: %d exit: %d error: %d )\n", 
+        GatewayAppData.RunStatus, CFE_ES_RunStatus_UNDEFINED, CFE_ES_RunStatus_APP_RUN, 
+        CFE_ES_RunStatus_APP_EXIT, CFE_ES_RunStatus_APP_ERROR);
 
-    /*
-    ** Initialize app command execution counters
-    */
+    // Initialize app command execution counters
     GatewayAppData.CmdCounter = 0;
     GatewayAppData.ErrCounter = 0;
     GatewayAppData.square_counter = 0;
     GatewayAppData.hk_counter = 0;
 
     GatewayAppData.HkTlm.Payload.state.pose.x = 0.0;
-    GatewayAppData.HkTlm.Payload.state.pose.y = 0.0;
-    GatewayAppData.HkTlm.Payload.state.pose.z = 0.0;
-    GatewayAppData.HkTlm.Payload.state.pose.qx = 0.0;
-    GatewayAppData.HkTlm.Payload.state.pose.qy = 0.0;
-    GatewayAppData.HkTlm.Payload.state.pose.qz = 0.0;
-    GatewayAppData.HkTlm.Payload.state.pose.qw = 0.0;
 
-    /*
-    ** Initialize app configuration data
-    */
+    // Initialize app configuration data
     GatewayAppData.PipeDepth = GATEWAY_APP_PIPE_DEPTH;
 
     strncpy(GatewayAppData.PipeName, "GATEWAY_APP_PIPE", sizeof(GatewayAppData.PipeName));
@@ -202,16 +191,13 @@ int32 GatewayAppInit(void)
         CFE_ES_WriteToSysLog("GatewayApp: Error Registering Events, RC = 0x%08lX\n", (unsigned long)status);
         return (status);
     }
-
-    /*
-    ** Initialize housekeeping packet (clear user data area).
-    */
+    
+    // Initialize housekeeping packet (clear user data area).
     CFE_MSG_Init(&GatewayAppData.HkTlm.TlmHeader.Msg, CFE_SB_ValueToMsgId(GATEWAY_APP_HK_TLM_MID), sizeof(GatewayAppData.HkTlm));
-    CFE_MSG_Init(&GatewayAppData.LastTwist.TlmHeader.Msg, CFE_SB_ValueToMsgId(GATEWAY_APP_TLM_TWIST_MID), sizeof(GatewayAppData.LastTwist));
 
-    /*
-    ** Create Software Bus message pipe.
-    */
+    CFE_MSG_Init(&tlm_pose.TlmHeader.Msg, CFE_SB_ValueToMsgId(GATEWAY_APP_TLM_MID), sizeof(tlm_pose) );
+
+    // Create Software Bus message pipe.
     status = CFE_SB_CreatePipe(&GatewayAppData.CommandPipe, GatewayAppData.PipeDepth, GatewayAppData.PipeName);
     if (status != CFE_SUCCESS)
     {
@@ -219,9 +205,7 @@ int32 GatewayAppInit(void)
         return (status);
     }
 
-    /*
-    ** Subscribe to Housekeeping request commands
-    */
+    // Subscribe to Housekeeping request commands
     status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(GATEWAY_APP_SEND_HK_MID), GatewayAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
@@ -229,9 +213,7 @@ int32 GatewayAppInit(void)
         return (status);
     }
 
-    /*
-    ** Subscribe to ground command packets
-    */
+    // Subscribe to ground command packets
     status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(GATEWAY_APP_CMD_MID), GatewayAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
@@ -240,10 +222,7 @@ int32 GatewayAppInit(void)
         return (status);
     }
 
-
-    /*
-    ** Subscribe to flight odom data
-    */
+    // Subscribe to flight odom data
     status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(GATEWAY_APP_CMD_ODOM_MID), GatewayAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
@@ -253,9 +232,7 @@ int32 GatewayAppInit(void)
     }
 
     
-    /*
-    ** Subscribe to HR wakeup
-    */
+    // Subscribe to HR wakeup
     status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(GATEWAY_APP_HR_CONTROL_MID), GatewayAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
@@ -266,10 +243,10 @@ int32 GatewayAppInit(void)
 
     CFE_EVS_SendEvent(GATEWAY_APP_STARTUP_INF_EID, CFE_EVS_EventType_INFORMATION, "Edoras App Initialized.%s",
                       GATEWAY_APP_VERSION_STRING);
-
+    printf("DEBUG -- Returning cfe success from init... \n");
     return (CFE_SUCCESS);
 
-} /* End of GatewayAppInit() */
+} 
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
@@ -312,25 +289,21 @@ void GatewayAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
 
     return;
 
-} /* End GatewayAppProcessCommandPacket */
+}
 
 
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
-/*                                                                            */
-/* GatewayAppProcessGroundCommand() -- Edoras App ground commands                */
-/*                                                                            */
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
+/**                                   
+ * @function GatewayAppProcessGroundCommand
+ * @brief Edoras App ground commands               
+ */
 void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 {
     CFE_MSG_FcnCode_t CommandCode = 0;
-
     CFE_MSG_GetFcnCode(&SBBufPtr->Msg, &CommandCode);
 
     printf("GatewayAppProcessGroundCommand() -- we're getting a ground command...%d\n", CommandCode);
 
-    /*
-    ** Process "known" Edoras App ground commands
-    */
+    // Process "known" Edoras App ground commands
     switch (CommandCode)
     {
         case GATEWAY_APP_NOOP_CC:
@@ -344,41 +317,21 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 
         case GATEWAY_APP_SET_TWIST_CC:
         {
-            printf("Twist....\n");
+            printf("Receiving a Twist command....\n");
             //if (GatewayAppVerifyCmdLength(&SBBufPtr->Msg, sizeof(GatewayAppTwistCmd_t)))
             //{
               // Let's see if we can deserialize
               
-  // You know the first 8 bytes are the header
-  size_t offset = 0;
-  unsigned char header[8];
-  memcpy(&header, SBBufPtr + offset, sizeof(header));
-  printf("Got command data!: Deserializing: header :D :D :D: %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x \n", header[0], header[1], header[2], header[3], header[4], header[5], header[6], header[7]);
+            // You know the first 8 bytes are the header
+            size_t offset = 0;
+            unsigned char header[8];
+            memcpy(&header, SBBufPtr + offset, sizeof(header));
+            printf("Got command data!: Deserializing: header :D :D :D: %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x \n", 
+                   header[0], header[1], header[2], header[3], header[4], header[5], header[6], header[7]);
   
-    size_t actual_length = 0;
-    CFE_MSG_GetSize(&SBBufPtr->Msg, &actual_length);
-    printf("******************************** Actual length of command: %ld. Minus header: %ld \n", actual_length, actual_length - 8);
-
- /* offset = offset + sizeof(header);
-              struct Data* data2 = deserialize((unsigned char*)SBBufPtr, 56 - sizeof(header), offset);
-              printf("After deserializing: data2: age: %d first name: %s last name: %s \n", data2->age, data2->first_name, data2->last_name);    
-
-                //GatewayAppCmdTwist((GatewayAppTwistCmd_t *)SBBufPtr);
-            //}
-*/
-        //    testing(3);
-        const TypeInfo_t * ti; 
-        void* ts_library;
-        const TypeSupport_t* ts;
-        const char* interface_type = "sensor_msgs"; //"geometry_msgs";
-        const char* interface_name = "JointState";
-        ti = get_type_info(interface_type, interface_name);
-        printf("Type info for %s::%s has %u members \n", interface_type, interface_name, ti->member_count_);
-        printf("Loading type support...\n");
-        ts_library = get_type_support_library(interface_type, interface_name);
-        ts = get_type_support(interface_type, interface_name, ts_library);
-        const char* tpid = ts->typesupport_identifier;
-        printf("Type support identifier in gateway_app: %s \n", tpid);
+            size_t actual_length = 0;
+            CFE_MSG_GetSize(&SBBufPtr->Msg, &actual_length);
+            printf("***************** Actual length of command: %ld. Minus header: %ld \n", actual_length, actual_length - 8);
         
         // Parse the information  
         offset = 8;
@@ -392,10 +345,15 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
         uint8_t* msg_pointer;
         offset = 8;
         size_t buffer_size;
-        msg_pointer = from_uint_buffer_to_msg_pointer( (uint8_t*)SBBufPtr, offset, ts, ti, &buffer_size);
-        printf("Size of msg pointer: %lu \n", sizeof(msg_pointer));
-        printf("Buffer size: %ld\n", buffer_size);
-        debug_parse_buffer(msg_pointer, ti);
+        msg_pointer = from_uint_buffer_to_msg_pointer( (uint8_t*)SBBufPtr, offset, parse_twist_.ts, parse_twist_.ti, &buffer_size);
+        
+        // Get data
+        double vel_lin, vel_ang;
+        get_float64(msg_pointer, parse_twist_.ti, "linear.x", &vel_lin);
+        get_float64(msg_pointer, parse_twist_.ti, "angular.z", &vel_ang);        
+        //debug_parse_buffer(msg_pointer, parse_twist_.ti);
+        printf("Reading linear velocity: %f and angular : %f \n", vel_lin, vel_ang);
+        
         
        }
              break;
@@ -507,31 +465,28 @@ void HighRateControLoop(void) {
     // 1. Publish the twist to State in rosfsw (it is like sending a command to the robot)
     // (we should use another name, telemetry is not supposed to command anything)
 
-    // if (GatewayAppData.square_counter%1000 == 0)    
     {
-    CFE_SB_TimeStampMsg(&GatewayAppData.LastTwist.TlmHeader.Msg);
-    CFE_SB_TransmitMsg(&GatewayAppData.LastTwist.TlmHeader.Msg, true);    
-    }
+     // Update telemetry data
+     //uint8_t* pose_msg = create_msg(parse_pose_.ti);
+     // Fill data
+     //set_msg_float_value("position.x", 0.1);
+     //set_msg_float_value("position.y", 0.2);
+     //set_msg_float_value("position.z", 0.3);
 
- 
+     //set_msg_float_value("orientation.w", 1.0);
+     // Convert data to serialized version       
+    CFE_SB_TimeStampMsg(&tlm_pose.TlmHeader.Msg);
+    CFE_SB_TransmitMsg(&tlm_pose.TlmHeader.Msg, true);    
+    }
     
     // 2. Update the telemetry information        
     GatewayAppOdometry_t *st = &lastOdomMsg; //GatewayAppGoal.StateTlm;
 
     GatewayAppData.HkTlm.Payload.state.pose.x = st->pose.x;
     GatewayAppData.HkTlm.Payload.state.pose.y = st->pose.y;
-    GatewayAppData.HkTlm.Payload.state.pose.z = st->pose.z;
-    GatewayAppData.HkTlm.Payload.state.pose.qx = st->pose.qx;
-    GatewayAppData.HkTlm.Payload.state.pose.qy = st->pose.qy;
-    GatewayAppData.HkTlm.Payload.state.pose.qz = st->pose.qz;
-    GatewayAppData.HkTlm.Payload.state.pose.qw = st->pose.qw;
 
     GatewayAppData.HkTlm.Payload.state.twist.linear_x = st->twist.linear_x;
     GatewayAppData.HkTlm.Payload.state.twist.linear_y = st->twist.linear_y;
-    GatewayAppData.HkTlm.Payload.state.twist.linear_z = st->twist.linear_z;
-    GatewayAppData.HkTlm.Payload.state.twist.angular_x = st->twist.angular_x;
-    GatewayAppData.HkTlm.Payload.state.twist.angular_y = st->twist.angular_y;
-    GatewayAppData.HkTlm.Payload.state.twist.angular_z = st->twist.angular_z;                
 
     // This data is sent when a Housekeeping request is received, 
     // (usually, at a low rate) so nothing sent here

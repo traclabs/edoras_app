@@ -42,6 +42,8 @@
 #include "gateway_app_msgids.h"
 #include "gateway_app_msg.h"
 
+#include <edoras_core/interface.h>
+
 /***********************************************************************/
 #define GATEWAY_APP_PIPE_DEPTH 32 /* Depth of the Command Pipe for Application */
 /************************************************************************
@@ -51,6 +53,14 @@
 /*
 ** Global Data
 */
+typedef struct 
+{
+const TypeInfo_t * ti; 
+void* ts_library;
+const TypeSupport_t* ts;
+const char* interface_type;
+const char* interface_name;
+} ParseData_t;
 
 typedef struct
 {
@@ -62,15 +72,12 @@ typedef struct
 
     uint32 square_counter;
     uint32 hk_counter;
-    /*
-    ** Housekeeping telemetry packet...
-    */
+   
+    // Housekeeping telemetry packet...
     GatewayAppHkTlm_t HkTlm;
     GatewayAppTlmRobotCommand_t LastTwist;
     
-    /*
-    ** Run Status variable used in the main processing loop
-    */
+    // Run Status variable used in the main processing loop
     uint32 RunStatus;
 
     /*
