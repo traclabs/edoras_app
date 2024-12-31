@@ -19,7 +19,7 @@
 
 #include <math.h>
 
-#include "debug_utils_c_version.h"
+//#include "debug_utils_c_version.h"
 
 
 #include "serialize_library.h"
@@ -43,7 +43,7 @@ ParseData_t parse_twist_;
 typedef struct
 {
     CFE_MSG_TelemetryHeader_t  TlmHeader;
-    uint8_t data[56];
+    uint8_t data[76]; // 56 for c ros struct, 76 serialized
 } PoseData_t;
 
 PoseData_t tlm_pose;
@@ -477,10 +477,22 @@ void HighRateControlLoop(void) {
      debug_parse_buffer(pose_msg, parse_pose_.ti);
 
      // Convert data to serialized version
-     uint8_t* test_tlm_data = NULL;
-    from_msg_pointer_to_uint_buffer(pose_msg, parse_pose_.ts, parse_pose_.ti, test_tlm_data);
-    CFE_SB_TimeStampMsg(&tlm_pose.TlmHeader.Msg);
-    CFE_SB_TransmitMsg(&tlm_pose.TlmHeader.Msg, true);    
+     uint8_t* tlm_data = NULL;
+     size_t tlm_data_size;
+     tlm_data = from_msg_pointer_to_uint_buffer(pose_msg, parse_pose_.ts, parse_pose_.ti, &tlm_data_size);
+     printf("Tlm data size: %ld and %ld \n", sizeof(tlm_data), tlm_data_size);
+
+     // Fill
+     printf("Data packed up to send back to ground \n");
+     for(size_t i = 0; i < tlm_data_size; ++i)
+     {
+        memcpy(&tlm_pose.data[i], (uint8_t*) tlm_data + i, sizeof(uint8_t)); 
+        printf("%02x ", tlm_pose.data[i]);
+     } printf("\n");
+     
+     
+     CFE_SB_TimeStampMsg(&tlm_pose.TlmHeader.Msg);
+     CFE_SB_TransmitMsg(&tlm_pose.TlmHeader.Msg, true);    
     }
     
     // 2. Update the telemetry information        

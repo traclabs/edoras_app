@@ -4,7 +4,7 @@ include_directories(fsw/mission_inc)
 include_directories(fsw/platform_inc)
 #include_directories(${gateway_app_MISSION_DIR}/fsw/platform_inc) # ros_app?
 
-set(edoras_core_DIR $ENV{HOME}/local/nanex/lib/cmake/edoras_core)
+set(edoras_core_DIR $ENV{HOME}/local/lib/cmake/edoras_core)
 find_package(edoras_core REQUIRED)
 
 # TODO: Get rid of this, just use another edoras bridge to talk to robot
@@ -32,10 +32,6 @@ target_include_directories(gateway_app PUBLIC
 # ${DEP_INCLUDE_DIRS}
 
 )
-
-add_executable(test_conversion fsw/src/test_conversion.c)
-target_link_libraries(test_conversion
-                      ${edoras_core_LIBRARIES})
 
 get_target_property(target_options gateway_app COMPILE_OPTIONS)
 list(REMOVE_ITEM target_options "-pedantic")
