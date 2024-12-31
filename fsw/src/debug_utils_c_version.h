@@ -1,5 +1,5 @@
-#ifndef __ROBOT_COMM_UDP_TEST_H__
-#define __ROBOT_COMM_UDP_TEST_H__
+#ifndef __GATEWAY_APP_DEBUG_UTILS_C_VERSION_H__
+#define __GATEWAY_APP_DEBUG_UTILS_C_VERSION_H__
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -21,4 +21,4 @@ bool setupComm( CommData_t* _cd, int _cfs_port, int _robot_port);
 bool sendGoalPose( CommData_t* _cd, double _x, double _y, double _z, double _roll, double _pitch, double _yaw);
 bool receiveJointState(CommData_t* _cd, double _joint[7]);
 
-#endif // __ROBOT_COMM_UDP_TEST_H__
+#endif // __GATEWAY_APP_DEBUG_UTILS_C_VERSION_H__
