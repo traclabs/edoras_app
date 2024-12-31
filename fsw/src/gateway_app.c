@@ -482,6 +482,12 @@ void HighRateControlLoop(void) {
      tlm_data = from_msg_pointer_to_uint_buffer(pose_msg, parse_pose_.ts, parse_pose_.ti, &tlm_data_size);
      printf("Tlm data size: %ld and %ld \n", sizeof(tlm_data), tlm_data_size);
 
+     // See header
+        printf("*** Tlm Header for Pose: ");
+     for(size_t i = 0; i < 8; ++i)
+        printf("%02x ", tlm_pose.TlmHeader.Msg.Byte[i]);     
+     printf("*****\n");
+
      // Fill
      printf("Data packed up to send back to ground \n");
      for(size_t i = 0; i < tlm_data_size; ++i)
