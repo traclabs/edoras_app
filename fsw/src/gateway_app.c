@@ -476,7 +476,9 @@ void HighRateControlLoop(void) {
 
      debug_parse_buffer(pose_msg, parse_pose_.ti);
 
-     // Convert data to serialized version       
+     // Convert data to serialized version
+     uint8_t* test_tlm_data = NULL;
+    from_msg_pointer_to_uint_buffer(pose_msg, parse_pose_.ts, parse_pose_.ti, test_tlm_data);
     CFE_SB_TimeStampMsg(&tlm_pose.TlmHeader.Msg);
     CFE_SB_TransmitMsg(&tlm_pose.TlmHeader.Msg, true);    
     }
