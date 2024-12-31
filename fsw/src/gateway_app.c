@@ -48,7 +48,7 @@ typedef struct
 
 PoseData_t tlm_pose;
 
-void HighRateControLoop(void);
+void HighRateControlLoop(void);
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  * *  * * * * **/
 /* GatewayAppMain() -- Application entry point and main process loop         */
@@ -149,9 +149,6 @@ int32 GatewayAppInit(void)
     int32 status;
 
     GatewayAppData.RunStatus = CFE_ES_RunStatus_APP_RUN;
-        printf("Debug 1.5.b . Run Status: %d (undefined: %d run: %d exit: %d error: %d )\n", 
-        GatewayAppData.RunStatus, CFE_ES_RunStatus_UNDEFINED, CFE_ES_RunStatus_APP_RUN, 
-        CFE_ES_RunStatus_APP_EXIT, CFE_ES_RunStatus_APP_ERROR);
 
     // Initialize app command execution counters
     GatewayAppData.CmdCounter = 0;
@@ -278,7 +275,7 @@ void GatewayAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
             break;
 
         case GATEWAY_APP_HR_CONTROL_MID:
-            HighRateControLoop();
+            HighRateControlLoop();
             break;
             
         default:
@@ -460,20 +457,25 @@ int32 GatewayAppCmdTwist(const GatewayAppTwistCmd_t *Msg)
     
 }
 
-void HighRateControLoop(void) {
+void HighRateControlLoop(void) {
     
     // 1. Publish the twist to State in rosfsw (it is like sending a command to the robot)
     // (we should use another name, telemetry is not supposed to command anything)
 
-    {
+    { 
      // Update telemetry data
-     //uint8_t* pose_msg = create_msg(parse_pose_.ti);
-     // Fill data
-     //set_msg_float_value("position.x", 0.1);
-     //set_msg_float_value("position.y", 0.2);
-     //set_msg_float_value("position.z", 0.3);
+     uint8_t* pose_msg = create_msg(parse_pose_.ti);
 
-     //set_msg_float_value("orientation.w", 1.0);
+     // Fill data
+     set_float64(pose_msg, parse_pose_.ti, "position.x", 0.1);
+     set_float64(pose_msg, parse_pose_.ti, "position.y", 0.2);
+     set_float64(pose_msg, parse_pose_.ti, "position.z", 0.3);
+
+     set_float64(pose_msg, parse_pose_.ti, "orientation.z", 0.7);
+     set_float64(pose_msg, parse_pose_.ti, "orientation.w", 0.7);
+
+     debug_parse_buffer(pose_msg, parse_pose_.ti);
+
      // Convert data to serialized version       
     CFE_SB_TimeStampMsg(&tlm_pose.TlmHeader.Msg);
     CFE_SB_TransmitMsg(&tlm_pose.TlmHeader.Msg, true);    
