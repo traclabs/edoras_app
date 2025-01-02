@@ -84,8 +84,7 @@ void GatewayAppMain(void)
 
     // Run loop
     while (CFE_ES_RunLoop(&GatewayAppData.RunStatus) == true)
-    {   printf("Loop is running in Gateway ----------------------- \n");
-
+    {   
         // Performance Log Exit Stamp
         CFE_ES_PerfLogExit(GATEWAY_APP_PERF_ID);
 
@@ -259,7 +258,7 @@ void GatewayAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
     CFE_SB_MsgId_t MsgId = CFE_SB_INVALID_MSG_ID;
 
     CFE_MSG_GetMsgId(&SBBufPtr->Msg, &MsgId);
-    printf("GatewayAppProcessCommandPacket() -- we're processing the cmd from MID: 0x%04x\n", CFE_SB_MsgIdToValue(MsgId));
+    //printf("DEBUG: -- we're processing the cmd from MID: 0x%04x\n", CFE_SB_MsgIdToValue(MsgId));
     switch (CFE_SB_MsgIdToValue(MsgId))
     {
         case GATEWAY_APP_CMD_MID:
@@ -314,7 +313,8 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 
         case GATEWAY_APP_SET_TWIST_CC:
         {
-            printf("Receiving a Twist command....\n");
+         // COMMENTING OUT WHILE WE TEST TELEMETRY
+           /* printf("Receiving a Twist command....\n");
             //if (GatewayAppVerifyCmdLength(&SBBufPtr->Msg, sizeof(GatewayAppTwistCmd_t)))
             //{
               // Let's see if we can deserialize
@@ -350,7 +350,7 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
         get_float64(msg_pointer, parse_twist_.ti, "angular.z", &vel_ang);        
         //debug_parse_buffer(msg_pointer, parse_twist_.ti);
         printf("Reading linear velocity: %f and angular : %f \n", vel_lin, vel_ang);
-        
+        */
         
        }
              break;
@@ -406,8 +406,58 @@ void GatewayAppProcessFlightOdom(CFE_SB_Buffer_t *SBBufPtr)
 /* * * * * * * * * * * * * * * * * * * * * * * *  * * * * * * *  * *  * * * * */
 int32 GatewayAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
 {
-    printf("GatewayAppReportHousekeeping() -- sending odom as part of housekeeping...\n");
-    
+    printf("GatewayAppReportHousekeeping() -- sending Pose as part of housekeeping...\n");
+   
+    { 
+     // Update telemetry data
+     uint8_t* pose_msg = create_msg(parse_pose_.ti);
+
+     // Fill data
+     set_float64(pose_msg, parse_pose_.ti, "position.x", 0.1);
+     set_float64(pose_msg, parse_pose_.ti, "position.y", 0.2);
+     set_float64(pose_msg, parse_pose_.ti, "position.z", 0.3);
+
+     set_float64(pose_msg, parse_pose_.ti, "orientation.z", 0.7);
+     set_float64(pose_msg, parse_pose_.ti, "orientation.w", 0.7);
+
+     debug_parse_buffer(pose_msg, parse_pose_.ti);
+
+     // Convert data to serialized version
+     uint8_t* tlm_data = NULL;
+     size_t tlm_data_size;
+     tlm_data = from_msg_pointer_to_uint_buffer(pose_msg, parse_pose_.ts, parse_pose_.ti, &tlm_data_size);
+     
+     printf("Size of parse_pose element: %ld. Size of tlm header: %ld, size of Tlm data size: %ld \n", 
+            sizeof(tlm_pose), sizeof(CFE_MSG_TelemetryHeader_t), tlm_data_size);
+ 
+     // See header
+     printf("*** Tlm Header sent to ground: ");
+     for(size_t i = 0; i < 8; i++)
+        printf("%02x ", tlm_pose.TlmHeader.Msg.Byte[i]);     
+     printf("\n");
+
+     // Fill
+     printf("Data packed up to send back to ground \n");
+     for(size_t i = 0; i < tlm_data_size; i++)
+     {
+        memcpy(&tlm_pose.data[i], (uint8_t*) tlm_data + i, sizeof(uint8_t)); 
+        printf("%02x ", tlm_pose.data[i]);
+        if(i % 8 == 7)
+          printf("\n");
+     } printf("\n");
+     
+     
+     CFE_SB_TimeStampMsg(&tlm_pose.TlmHeader.Msg);
+     // update_header: If true, the sequence counter bit in the primary header will increase each time
+     // If false, it will remain zero.
+     bool update_header = true;
+     CFE_SB_TransmitMsg(&tlm_pose.TlmHeader.Msg, update_header); 
+     
+     // Clean up
+     free(pose_msg);
+     free(tlm_data);
+    }
+ 
     /*
     ** Get command execution counters...
     */
@@ -416,7 +466,6 @@ int32 GatewayAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
     GatewayAppData.HkTlm.Payload.CommandCounter      = GatewayAppData.CmdCounter++;
 
     OS_printf("GatewayAppReportHousekeeping reporting: %d\n", GatewayAppData.HkTlm.Payload.CommandCounter);
-
  
     CFE_SB_TimeStampMsg(&GatewayAppData.HkTlm.TlmHeader.Msg);
     CFE_SB_TransmitMsg(&GatewayAppData.HkTlm.TlmHeader.Msg, true);
@@ -458,49 +507,7 @@ int32 GatewayAppCmdTwist(const GatewayAppTwistCmd_t *Msg)
 }
 
 void HighRateControlLoop(void) {
-    
-    // 1. Publish the twist to State in rosfsw (it is like sending a command to the robot)
-    // (we should use another name, telemetry is not supposed to command anything)
-
-    { 
-     // Update telemetry data
-     uint8_t* pose_msg = create_msg(parse_pose_.ti);
-
-     // Fill data
-     set_float64(pose_msg, parse_pose_.ti, "position.x", 0.1);
-     set_float64(pose_msg, parse_pose_.ti, "position.y", 0.2);
-     set_float64(pose_msg, parse_pose_.ti, "position.z", 0.3);
-
-     set_float64(pose_msg, parse_pose_.ti, "orientation.z", 0.7);
-     set_float64(pose_msg, parse_pose_.ti, "orientation.w", 0.7);
-
-     debug_parse_buffer(pose_msg, parse_pose_.ti);
-
-     // Convert data to serialized version
-     uint8_t* tlm_data = NULL;
-     size_t tlm_data_size;
-     tlm_data = from_msg_pointer_to_uint_buffer(pose_msg, parse_pose_.ts, parse_pose_.ti, &tlm_data_size);
-     printf("Tlm data size: %ld and %ld \n", sizeof(tlm_data), tlm_data_size);
-
-     // See header
-        printf("*** Tlm Header for Pose: ");
-     for(size_t i = 0; i < 8; ++i)
-        printf("%02x ", tlm_pose.TlmHeader.Msg.Byte[i]);     
-     printf("*****\n");
-
-     // Fill
-     printf("Data packed up to send back to ground \n");
-     for(size_t i = 0; i < tlm_data_size; ++i)
-     {
-        memcpy(&tlm_pose.data[i], (uint8_t*) tlm_data + i, sizeof(uint8_t)); 
-        printf("%02x ", tlm_pose.data[i]);
-     } printf("\n");
-     
-     
-     CFE_SB_TimeStampMsg(&tlm_pose.TlmHeader.Msg);
-     CFE_SB_TransmitMsg(&tlm_pose.TlmHeader.Msg, true);    
-    }
-    
+        
     // 2. Update the telemetry information        
     GatewayAppOdometry_t *st = &lastOdomMsg; //GatewayAppGoal.StateTlm;
 
