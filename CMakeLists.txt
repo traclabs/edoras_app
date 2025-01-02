@@ -8,7 +8,7 @@ set(edoras_core_DIR $ENV{HOME}/local/lib/cmake/edoras_core)
 find_package(edoras_core REQUIRED)
 
 # TODO: Get rid of this, just use another edoras bridge to talk to robot
-set(EDORAS_WS /home/ana/ros2/edoras_ws)
+set(EDORAS_WS $ENV{HOME}/ros2/edoras_ws)
 set(SCRATCH_DIR ${EDORAS_WS}/edoras/src/scratch)
 #include_directories(${SCRATCH_DIR}/c_serialize_udp)
 link_directories(${SCRATCH_DIR}/c_serialize_udp/build)
