@@ -313,8 +313,6 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 
         case GATEWAY_APP_SET_TWIST_CC:
         {
-         // COMMENTING OUT WHILE WE TEST TELEMETRY
-           /* printf("Receiving a Twist command....\n");
             //if (GatewayAppVerifyCmdLength(&SBBufPtr->Msg, sizeof(GatewayAppTwistCmd_t)))
             //{
               // Let's see if we can deserialize
@@ -323,7 +321,7 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
             size_t offset = 0;
             unsigned char header[8];
             memcpy(&header, SBBufPtr + offset, sizeof(header));
-            printf("Got command data!: Deserializing: header :D :D :D: %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x \n", 
+            printf("Got command data: Header: %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x \n", 
                    header[0], header[1], header[2], header[3], header[4], header[5], header[6], header[7]);
   
             size_t actual_length = 0;
@@ -332,15 +330,7 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
         
         // Parse the information  
         offset = 8;
-        //uint8_t data_buffer[actual_length - offset];
-        //memcpy(&data_buffer, SBBufPtr + offset, actual_length - offset); 
-        //printf("Coping %ld bytes to data_buffer \n", actual_length - offset);
-        
-        size_t buffer_length_test;
-        memcpy(&buffer_length_test, (uint8_t*)SBBufPtr + offset, sizeof(size_t));
-        printf("Reading raw: buffer length test: %ld \n", buffer_length_test);
-        uint8_t* msg_pointer;
-        offset = 8;
+        uint8_t* msg_pointer = NULL;
         size_t buffer_size;
         msg_pointer = from_uint_buffer_to_msg_pointer( (uint8_t*)SBBufPtr, offset, parse_twist_.ts, parse_twist_.ti, &buffer_size);
         
@@ -350,7 +340,7 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
         get_float64(msg_pointer, parse_twist_.ti, "angular.z", &vel_ang);        
         //debug_parse_buffer(msg_pointer, parse_twist_.ti);
         printf("Reading linear velocity: %f and angular : %f \n", vel_lin, vel_ang);
-        */
+        
         
        }
              break;
@@ -437,15 +427,11 @@ int32 GatewayAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
      printf("\n");
 
      // Fill
-     printf("Data packed up to send back to ground \n");
      for(size_t i = 0; i < tlm_data_size; i++)
-     {
-        memcpy(&tlm_pose.data[i], (uint8_t*) tlm_data + i, sizeof(uint8_t)); 
-        printf("%02x ", tlm_pose.data[i]);
-        if(i % 8 == 7)
-          printf("\n");
-     } printf("\n");
-     
+        memcpy(&tlm_pose.data[i], (uint8_t*)(tlm_data) + i, sizeof(uint8_t)); 
+    
+     // Debug
+     //printBuffer(tlm_data, tlm_data_size, "Data to send back to ground: ");
      
      CFE_SB_TimeStampMsg(&tlm_pose.TlmHeader.Msg);
      // update_header: If true, the sequence counter bit in the primary header will increase each time
