@@ -19,10 +19,6 @@
 
 #include <math.h>
 
-//#include "debug_utils_c_version.h"
-
-
-#include "serialize_library.h"
 #include "robot_comm_udp_test.h"
 
 #define ROBOT_PORT 8585
@@ -109,7 +105,7 @@ void GatewayAppMain(void)
         */
         CFE_ES_PerfLogEntry(GATEWAY_APP_PERF_ID);
     }
-    printf("GATEWAY Loop was ended **************************** \n");
+
     // Performance Log Exit Stamp
     CFE_ES_PerfLogExit(GATEWAY_APP_PERF_ID);
 
@@ -341,7 +337,8 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
         //debug_parse_buffer(msg_pointer, parse_twist_.ti);
         printf("Reading linear velocity: %f and angular : %f \n", vel_lin, vel_ang);
         
-        
+        // Send data to robot!!!
+        sendTwistCmd(&commData, vel_lin, 0, 0, 0, 0, vel_ang);
        }
              break;
 
@@ -396,19 +393,25 @@ void GatewayAppProcessFlightOdom(CFE_SB_Buffer_t *SBBufPtr)
 /* * * * * * * * * * * * * * * * * * * * * * * *  * * * * * * *  * *  * * * * */
 int32 GatewayAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
 {
-    printf("GatewayAppReportHousekeeping() -- sending Pose as part of housekeeping...\n");
-   
     { 
-     // Update telemetry data
+     // Read telemetry, if any
+     double pos[3]; double orient[4];
+     if(!receivePoseTlm(&commData, pos, orient))
+       return CFE_SUCCESS;
+       
+     // If data received from robot update telemetry data
+     // to send back to ground
      uint8_t* pose_msg = create_msg(parse_pose_.ti);
-
+     printf("Gateway telem from robot: %f %f %f -- %f %f %f %f \n", pos[0], pos[1], pos[2], orient[0], orient[1], orient[2], orient[3]);
      // Fill data
-     set_float64(pose_msg, parse_pose_.ti, "position.x", 0.1);
-     set_float64(pose_msg, parse_pose_.ti, "position.y", 0.2);
-     set_float64(pose_msg, parse_pose_.ti, "position.z", 0.3);
+     set_float64(pose_msg, parse_pose_.ti, "position.x", pos[0]);
+     set_float64(pose_msg, parse_pose_.ti, "position.y", pos[1]);
+     set_float64(pose_msg, parse_pose_.ti, "position.z", pos[2]);
 
-     set_float64(pose_msg, parse_pose_.ti, "orientation.z", 0.7);
-     set_float64(pose_msg, parse_pose_.ti, "orientation.w", 0.7);
+     set_float64(pose_msg, parse_pose_.ti, "orientation.x",  orient[0]);
+     set_float64(pose_msg, parse_pose_.ti, "orientation.y",  orient[1]);
+     set_float64(pose_msg, parse_pose_.ti, "orientation.z",  orient[2]);
+     set_float64(pose_msg, parse_pose_.ti, "orientation.w", orient[3]);
 
      debug_parse_buffer(pose_msg, parse_pose_.ti);
 
@@ -421,10 +424,10 @@ int32 GatewayAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
             sizeof(tlm_pose), sizeof(CFE_MSG_TelemetryHeader_t), tlm_data_size);
  
      // See header
-     printf("*** Tlm Header sent to ground: ");
-     for(size_t i = 0; i < 8; i++)
-        printf("%02x ", tlm_pose.TlmHeader.Msg.Byte[i]);     
-     printf("\n");
+     //printf("*** Tlm Header sent to ground: ");
+     //for(size_t i = 0; i < 8; i++)
+     //   printf("%02x ", tlm_pose.TlmHeader.Msg.Byte[i]);     
+     //printf("\n");
 
      // Fill
      for(size_t i = 0; i < tlm_data_size; i++)
