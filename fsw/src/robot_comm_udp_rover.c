@@ -1,7 +1,7 @@
 /**
- * @file robot_comm_udp_test.c
+ * @file robot_comm_udp_rover.c
  */
-#include "robot_comm_udp_test.h"
+#include "robot_comm_udp_rover.h"
 
 #include <arpa/inet.h>
 #include <string.h>
@@ -56,7 +56,7 @@ bool sendTwistCmd( CommData_t* _cd, double _lin_x, double _lin_y, double _lin_z,
  
    // DEBUG
    size_t ofi = 0;
-   printf("Command to be sent: ");
+   printf("* Twist command to be sent: ");
    for(int i =0; i < 6; ++i)
    {
       double val;
@@ -98,6 +98,10 @@ bool receivePoseTlm(CommData_t* _cd, double _position[3], double _orientation[4]
       // Fill fields
       _position[0] = data[0]; _position[1] = data[1]; _position[2] = data[2];
       _orientation[0] = data[3]; _orientation[1] = data[4]; _orientation[2] = data[5]; _orientation[3] = data[6];
+
+     printf("* Tlm pose received from robot: %f %f %f -- %f %f %f %f \n", _position[0], _position[1], _position[2], 
+        _orientation[0], _orientation[1], _orientation[2], _orientation[3]);
+     
       return true;  
     }
     

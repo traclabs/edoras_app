@@ -9,13 +9,13 @@ find_package(edoras_core REQUIRED)
 
  
 # Create library for talking to robot using sockets
-add_library(robot_comm_udp_test fsw/src/robot_comm_udp_test.c)
+add_library(robot_comm_udp_rover fsw/src/robot_comm_udp_rover.c)
 
 # Create the app module
 add_cfe_app(gateway_app fsw/src/gateway_app.c)
 target_link_libraries(gateway_app 
                       m 
-                      robot_comm_udp_test
+                      robot_comm_udp_rover
                       ${edoras_core_LIBRARIES})
 
 target_include_directories(gateway_app PUBLIC

@@ -1,5 +1,5 @@
-#ifndef __GATEWAY_APP_DEBUG_UTILS_C_VERSION_H__
-#define __GATEWAY_APP_DEBUG_UTILS_C_VERSION_H__
+#ifndef __ROBOT_COMM_UDP_ROVER_H__
+#define __ROBOT_COMM_UDP_ROVER_H__
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -18,7 +18,7 @@ typedef struct
 } CommData_t;
 
 bool setupComm( CommData_t* _cd, int _cfs_port, int _robot_port);
-bool sendGoalPose( CommData_t* _cd, double _x, double _y, double _z, double _roll, double _pitch, double _yaw);
-bool receiveJointState(CommData_t* _cd, double _joint[7]);
+bool sendTwistCmd( CommData_t* _cd, double _lin_x, double _lin_y, double _lin_z, double _ang_x, double _ang_y, double _ang_z);
+bool receivePoseTlm(CommData_t* _cd, double _position[3], double _orientation[4]);
 
-#endif // __GATEWAY_APP_DEBUG_UTILS_C_VERSION_H__
+#endif // __ROBOT_COMM_UDP_ROVER_H__

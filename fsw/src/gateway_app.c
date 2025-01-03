@@ -19,7 +19,8 @@
 
 #include <math.h>
 
-#include "robot_comm_udp_test.h"
+// To communicate with the actual robot locally
+#include "robot_comm_udp_rover.h"
 
 #define ROBOT_PORT 8585
 #define CFS_PORT 8080
@@ -293,8 +294,6 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
     CFE_MSG_FcnCode_t CommandCode = 0;
     CFE_MSG_GetFcnCode(&SBBufPtr->Msg, &CommandCode);
 
-    printf("GatewayAppProcessGroundCommand() -- we're getting a ground command...%d\n", CommandCode);
-
     // Process "known" Edoras App ground commands
     switch (CommandCode)
     {
@@ -317,12 +316,14 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
             size_t offset = 0;
             unsigned char header[8];
             memcpy(&header, SBBufPtr + offset, sizeof(header));
-            printf("Got command data: Header: %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x \n", 
-                   header[0], header[1], header[2], header[3], header[4], header[5], header[6], header[7]);
+            
+            // DEBUG
+            //printf("Got command data: Header: %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x \n", 
+            //       header[0], header[1], header[2], header[3], header[4], header[5], header[6], header[7]);
   
             size_t actual_length = 0;
             CFE_MSG_GetSize(&SBBufPtr->Msg, &actual_length);
-            printf("***************** Actual length of command: %ld. Minus header: %ld \n", actual_length, actual_length - 8);
+            //printf("******** DEBUG: Actual length of command: %ld. Minus header: %ld \n", actual_length, actual_length - 8);
         
         // Parse the information  
         offset = 8;
@@ -335,7 +336,7 @@ void GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
         get_float64(msg_pointer, parse_twist_.ti, "linear.x", &vel_lin);
         get_float64(msg_pointer, parse_twist_.ti, "angular.z", &vel_ang);        
         //debug_parse_buffer(msg_pointer, parse_twist_.ti);
-        printf("Reading linear velocity: %f and angular : %f \n", vel_lin, vel_ang);
+        //printf("Reading linear velocity: %f and angular : %f \n", vel_lin, vel_ang);
         
         // Send data to robot!!!
         sendTwistCmd(&commData, vel_lin, 0, 0, 0, 0, vel_ang);
@@ -396,13 +397,14 @@ int32 GatewayAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
     { 
      // Read telemetry, if any
      double pos[3]; double orient[4];
+                    
      if(!receivePoseTlm(&commData, pos, orient))
        return CFE_SUCCESS;
        
      // If data received from robot update telemetry data
      // to send back to ground
      uint8_t* pose_msg = create_msg(parse_pose_.ti);
-     printf("Gateway telem from robot: %f %f %f -- %f %f %f %f \n", pos[0], pos[1], pos[2], orient[0], orient[1], orient[2], orient[3]);
+
      // Fill data
      set_float64(pose_msg, parse_pose_.ti, "position.x", pos[0]);
      set_float64(pose_msg, parse_pose_.ti, "position.y", pos[1]);
@@ -413,15 +415,16 @@ int32 GatewayAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
      set_float64(pose_msg, parse_pose_.ti, "orientation.z",  orient[2]);
      set_float64(pose_msg, parse_pose_.ti, "orientation.w", orient[3]);
 
-     debug_parse_buffer(pose_msg, parse_pose_.ti);
+     // DEBUG 
+     //debug_parse_buffer(pose_msg, parse_pose_.ti);
 
      // Convert data to serialized version
      uint8_t* tlm_data = NULL;
      size_t tlm_data_size;
      tlm_data = from_msg_pointer_to_uint_buffer(pose_msg, parse_pose_.ts, parse_pose_.ti, &tlm_data_size);
      
-     printf("Size of parse_pose element: %ld. Size of tlm header: %ld, size of Tlm data size: %ld \n", 
-            sizeof(tlm_pose), sizeof(CFE_MSG_TelemetryHeader_t), tlm_data_size);
+     //printf("Size of parse_pose element: %ld. Size of tlm header: %ld, size of Tlm data size: %ld \n", 
+     //       sizeof(tlm_pose), sizeof(CFE_MSG_TelemetryHeader_t), tlm_data_size);
  
      // See header
      //printf("*** Tlm Header sent to ground: ");
