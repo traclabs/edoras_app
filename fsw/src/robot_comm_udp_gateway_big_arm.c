@@ -55,7 +55,7 @@ bool sendPoseCmd( CommData_t* _cd, double _pos_x, double _pos_y, double _pos_z, 
     }
  
    // DEBUG
-   size_t ofi = 0;
+   /*size_t ofi = 0;
    printf("* Pose command to be sent: ");
    for(int i =0; i < 7; ++i)
    {
@@ -63,7 +63,7 @@ bool sendPoseCmd( CommData_t* _cd, double _pos_x, double _pos_y, double _pos_z, 
       memcpy(&val, buf + ofi, sizeof(double));
       ofi += sizeof(double);
       printf("%f ", val);   
-   } printf("\n");
+   } printf("\n");*/
      
     int res = sendto(_cd->sock_fd, buf, bufSize, 0, (const struct sockaddr *)&_cd->other_address, sizeof(_cd->other_address));
  
@@ -101,8 +101,8 @@ bool receiveJointStateTlm(CommData_t* _cd, double _js[7], int32_t* _sec, uint32_
       memcpy(_nanosec, bp + offset, sizeof(uint32_t));
       offset += sizeof(uint32_t);
 
-     printf("* Tlm pose received from robot: %f %f %f %f %f %f %f - Time: sec: %d nanosec: %d \n", _js[0], _js[1], _js[2], 
-        _js[3], _js[4], _js[5], _js[6], *_sec, *_nanosec);
+     //printf("* Tlm pose received from robot: %f %f %f %f %f %f %f - Time: sec: %d nanosec: %d \n", _js[0], _js[1], _js[2], 
+     //   _js[3], _js[4], _js[5], _js[6], *_sec, *_nanosec);
      
       return true;  
     }
