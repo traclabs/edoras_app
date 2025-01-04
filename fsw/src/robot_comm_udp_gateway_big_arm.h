@@ -19,6 +19,6 @@ typedef struct
 
 bool setupComm( CommData_t* _cd, int _cfs_port, int _robot_port);
 bool sendPoseCmd( CommData_t* _cd, double _pos_x, double _pos_y, double _pos_z, double _orient_x, double _orient_y, double _orient_z, double _orient_w);
-bool receiveJointStateTlm(CommData_t* _cd, double _js[7]);
+bool receiveJointStateTlm(CommData_t* _cd, double _js[7], int32_t* _sec, uint32_t* _nanosec);
 
 #endif // __ROBOT_COMM_UDP_ROVER_H__

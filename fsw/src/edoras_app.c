@@ -395,8 +395,9 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
     { 
      // Read telemetry, if any
      double joints[7];
-                    
-     if(!receiveJointStateTlm(&commData, joints))
+     int32_t sec;
+     uint32_t nanosec;
+     if(!receiveJointStateTlm(&commData, joints, &sec, &nanosec))
        return CFE_SUCCESS;
        
      // If data received from robot update telemetry data
@@ -423,6 +424,9 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
      set_const_char(js_msg, parse_joint_state_.ti, "name.4", "big_arm_joint_6");
      set_const_char(js_msg, parse_joint_state_.ti, "name.5", "big_arm_joint_7");
      set_const_char(js_msg, parse_joint_state_.ti, "name.6", "big_arm_joint_8");
+
+     set_int32(js_msg, parse_joint_state_.ti, "header.stamp.sec", sec);
+     set_uint32(js_msg, parse_joint_state_.ti, "header.stamp.nanosec", nanosec);
 
      // DEBUG 
      debug_parse_buffer(js_msg, parse_joint_state_.ti);

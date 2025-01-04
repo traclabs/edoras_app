@@ -76,7 +76,7 @@ bool sendPoseCmd( CommData_t* _cd, double _pos_x, double _pos_y, double _pos_z, 
 /**
  * @function receivePoseTlm
  */
-bool receiveJointStateTlm(CommData_t* _cd, double _js[7])
+bool receiveJointStateTlm(CommData_t* _cd, double _js[7], int32_t* _sec, uint32_t* _nanosec)
 {
      ssize_t buffer_rcvd_size; 
      const int MAXLINE = 1024;
@@ -95,9 +95,14 @@ bool receiveJointStateTlm(CommData_t* _cd, double _js[7])
        offset += sizeof(double);
       }
 
+      // Sec
+      memcpy(_sec, bp + offset, sizeof(int32_t));
+      offset += sizeof(int32_t);
+      memcpy(_nanosec, bp + offset, sizeof(uint32_t));
+      offset += sizeof(uint32_t);
 
-     printf("* Tlm pose received from robot: %f %f %f %f %f %f %f \n", _js[0], _js[1], _js[2], 
-        _js[3], _js[4], _js[5], _js[6]);
+     printf("* Tlm pose received from robot: %f %f %f %f %f %f %f - Time: sec: %d nanosec: %d \n", _js[0], _js[1], _js[2], 
+        _js[3], _js[4], _js[5], _js[6], *_sec, *_nanosec);
      
       return true;  
     }
