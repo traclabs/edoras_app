@@ -8,13 +8,13 @@ To build:
 2. Locate the line that sets MISSION_GLOBAL_APPLIST (~line 89) your app:
 
    ```
-   list(APPEND MISSION_GLOBAL_APPLIST ros_app sbn sbn_udp sbn_f_remap cf  gateway_app)
+   list(APPEND MISSION_GLOBAL_APPLIST ros_app sbn sbn_udp sbn_f_remap cf  edoras_app)
    ```
    
 3. Go to cFS/sample_defs. Add the app in **cpuX_cfe_es_startup.scr** with X=1 or 2 :
 
    ```
-   CFE_APP, rover_app,   RoverAppMain,     GATEWAY_APP,    50,   16384, 0x0, 0; 
+   CFE_APP, rover_app,   RoverAppMain,     EDORAS_APP,    50,   16384, 0x0, 0; 
    ```
    
    

@@ -18,7 +18,7 @@
 **      See the License for the specific language governing permissions and
 **      limitations under the License.
 **
-** File: gateway_app.h
+** File: edoras_app.h
 **
 ** Purpose:
 **   This file is main hdr file for the ros application.
@@ -26,8 +26,8 @@
 **
 *******************************************************************************/
 
-#ifndef _gateway_app_h_
-#define _gateway_app_h_
+#ifndef _edoras_app_h_
+#define _edoras_app_h_
 
 /*
 ** Required header files.
@@ -38,14 +38,14 @@
 #include "cfe_sb.h"
 #include "cfe_es.h"
 
-#include "gateway_app_perfids.h"
-#include "gateway_app_msgids.h"
-#include "gateway_app_msg.h"
+#include "edoras_app_perfids.h"
+#include "edoras_app_msgids.h"
+#include "edoras_app_msg.h"
 
 #include <edoras_core/interface.h>
 
 /***********************************************************************/
-#define GATEWAY_APP_PIPE_DEPTH 32 /* Depth of the Command Pipe for Application */
+#define EDORAS_APP_PIPE_DEPTH 32 /* Depth of the Command Pipe for Application */
 /************************************************************************
 ** Type Definitions
 *************************************************************************/
@@ -74,8 +74,8 @@ typedef struct
     uint32 hk_counter;
    
     // Housekeeping telemetry packet...
-    GatewayAppHkTlm_t HkTlm;
-    GatewayAppTlmRobotCommand_t LastTwist;
+    EdorasAppHkTlm_t HkTlm;
+    EdorasAppTlmRobotCommand_t LastTwist;
     
     // Run Status variable used in the main processing loop
     uint32 RunStatus;
@@ -91,31 +91,31 @@ typedef struct
     char   PipeName[CFE_MISSION_MAX_API_LEN];
     uint16 PipeDepth;
 
-    CFE_EVS_BinFilter_t EventFilters[GATEWAY_APP_EVENT_COUNTS];
+    CFE_EVS_BinFilter_t EventFilters[EDORAS_APP_EVENT_COUNTS];
 
-} GatewayAppData_t;
+} EdorasAppData_t;
 
 /****************************************************************************/
 /*
 ** Local function prototypes.
 **
-** Note: Except for the entry point (GatewayAppMain), these
+** Note: Except for the entry point (EdorasAppMain), these
 **       functions are not called from any other source module.
 */
-void  GatewayAppMain(void);
+void  EdorasAppMain(void);
 
-int32 GatewayAppInit(void);
+int32 EdorasAppInit(void);
 
-void  GatewayAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr);
-void  GatewayAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr);
+void  EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr);
+void  EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr);
 
-int32 GatewayAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg);
-void GatewayAppProcessFlightOdom(CFE_SB_Buffer_t *SBBufPtr);
+int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg);
+void EdorasAppProcessFlightOdom(CFE_SB_Buffer_t *SBBufPtr);
 
-int32 GatewayAppNoop(const GatewayAppNoopCmd_t *Msg);
-int32 GatewayAppCmdTwist(const GatewayAppTwistCmd_t *Msg);
+int32 EdorasAppNoop(const EdorasAppNoopCmd_t *Msg);
+int32 EdorasAppCmdTwist(const EdorasAppTwistCmd_t *Msg);
 
-bool GatewayAppVerifyCmdLength(CFE_MSG_Message_t *MsgPtr, size_t ExpectedLength);
+bool EdorasAppVerifyCmdLength(CFE_MSG_Message_t *MsgPtr, size_t ExpectedLength);
 
 
-#endif /* _gateway_app_h_ */
+#endif /* _edoras_app_h_ */

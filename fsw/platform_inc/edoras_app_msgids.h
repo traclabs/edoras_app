@@ -1,4 +1,4 @@
-/*******************************************************************************
+/************************************************************************
 **
 **      GSC-18128-1, "Core Flight Executive Version 6.7"
 **
@@ -18,29 +18,29 @@
 **      See the License for the specific language governing permissions and
 **      limitations under the License.
 **
-** File: gateway_app_table.h
+** File: edoras_app_msgids.h
 **
 ** Purpose:
-**  Define gateway app table
+**  Define Edoras App Message IDs
 **
 ** Notes:
 **
 **
-*******************************************************************************/
-#ifndef _gateway_app_table_h_
-#define _gateway_app_table_h_
+*************************************************************************/
+#ifndef _edoras_app_msgids_h_
+#define _edoras_app_msgids_h_
 
-/**
- * Table structure
- */
-typedef struct
-{
-   uint16 Int1;
-   uint16 Int2;
-} RoverAppTable_t;
+#include "cfe_msgids.h"
 
-#endif /* _gateway_app_table_h_ */
+#define EDORAS_APP_CMD_MID     (CFE_PLATFORM_CMD_MID_BASE + 0x27)
+#define EDORAS_APP_SEND_HK_MID (CFE_PLATFORM_CMD_MID_BASE + 0x28)
+#define EDORAS_APP_CMD_ODOM_MID (CFE_PLATFORM_CMD_MID_BASE + 0x29)
 
-/************************/
-/*  End of File Comment */
-/************************/
+#define EDORAS_APP_HK_TLM_MID      (CFE_PLATFORM_TLM_MID_BASE + 0x26)
+#define EDORAS_APP_TLM_MID   (CFE_PLATFORM_TLM_MID_BASE + 0x27)
+#define EDORAS_APP_HR_CONTROL_MID  (CFE_PLATFORM_TLM_MID_BASE + 0x28)
+#endif /* _edoras_app_msgids_h_ */
+
+/*********************************/
+/* End of File Comment           */
+/*********************************/

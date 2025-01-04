@@ -18,23 +18,23 @@
 **      See the License for the specific language governing permissions and
 **      limitations under the License.
 **
-** File: gateway_app_msg.h
+** File: edoras_app_msg.h
 **
 ** Purpose:
-**  Define Gateway App Messages and info
+**  Define Edoras App Messages and info
 **
 ** Notes:
 **
 **
 *******************************************************************************/
-#ifndef _gateway_app_msg_h_
-#define _gateway_app_msg_h_
+#ifndef _edoras_app_msg_h_
+#define _edoras_app_msg_h_
 
 /**
- * GatewayApp command codes
+ * EdorasApp command codes
  */
-#define GATEWAY_APP_NOOP_CC        0
-#define GATEWAY_APP_SET_TWIST_CC   1
+#define EDORAS_APP_NOOP_CC        0
+#define EDORAS_APP_SET_TWIST_CC   1
 
 /*************************************************************************/
 
@@ -44,7 +44,7 @@
 typedef struct 
 {
    CFE_MSG_CommandHeader_t CmdHeader;
-} GatewayAppNoArgsCmd_t;
+} EdorasAppNoArgsCmd_t;
 
 typedef struct
 {
@@ -55,7 +55,7 @@ typedef struct
    float angular_x;
    float angular_y;
    float angular_z;
-} GatewayAppTwist_t;
+} EdorasAppTwist_t;
 
 typedef struct
 {
@@ -67,20 +67,20 @@ typedef struct
    float qy;
    float qz;
    float qw;   
-} GatewayAppPose_t;
+} EdorasAppPose_t;
 
 typedef struct
 {
-  GatewayAppPose_t pose;
-  GatewayAppTwist_t twist;
+  EdorasAppPose_t pose;
+  EdorasAppTwist_t twist;
   
-} GatewayAppOdometry_t;
+} EdorasAppOdometry_t;
 
 typedef struct
 {
    CFE_MSG_CommandHeader_t CmdHeader; // 8
-   GatewayAppTwist_t twist; // 6 floats = 6x4 = 24
-} GatewayAppTwistCmd_t;
+   EdorasAppTwist_t twist; // 6 floats = 6x4 = 24
+} EdorasAppTwistCmd_t;
 
 /*
 ** The following commands all share the "NoArgs" format
@@ -89,8 +89,8 @@ typedef struct
 ** allows them to change independently in the future without changing the prototype
 ** of the handler function
 */
-typedef GatewayAppNoArgsCmd_t GatewayAppNoopCmd_t;
-//typedef GatewayAppTwistCmd_t  GatewayAppTwistStateCmd_t;
+typedef EdorasAppNoArgsCmd_t EdorasAppNoopCmd_t;
+//typedef EdorasAppTwistCmd_t  EdorasAppTwistStateCmd_t;
 
 /*************************************************************************/
 
@@ -98,33 +98,33 @@ typedef struct
 {
     uint8 CommandErrorCounter;
     uint8 CommandCounter;
-    GatewayAppOdometry_t state;
-} GatewayAppHkTlmPayload_t;
+    EdorasAppOdometry_t state;
+} EdorasAppHkTlmPayload_t;
 
 typedef struct
 {
     CFE_MSG_TelemetryHeader_t  TlmHeader; /**< \brief Telemetry header */
-    GatewayAppHkTlmPayload_t Payload;   /**< \brief Telemetry payload */
-} GatewayAppHkTlm_t;
+    EdorasAppHkTlmPayload_t Payload;   /**< \brief Telemetry payload */
+} EdorasAppHkTlm_t;
 
 
 // These 2 messages are for communication with the robot on FSW side
 typedef struct
 {
     CFE_MSG_TelemetryHeader_t  TlmHeader; /**< \brief Telemetry header */
-    GatewayAppTwist_t twist; /**< Twist currently being applied **/
+    EdorasAppTwist_t twist; /**< Twist currently being applied **/
 
-} GatewayAppTlmRobotCommand_t;
+} EdorasAppTlmRobotCommand_t;
 
 typedef struct
 {
     CFE_MSG_CommandHeader_t  CmdHeader; /**< \brief Command header */
-    GatewayAppOdometry_t odom; /**< Twist the robot is currently using **/
+    EdorasAppOdometry_t odom; /**< Twist the robot is currently using **/
 
-} GatewayAppCmdRobotState_t;
+} EdorasAppCmdRobotState_t;
 
 
-#endif /* _gateway_app_msg_h_ */
+#endif /* _edoras_app_msg_h_ */
 
 /************************/
 /*  End of File Comment */

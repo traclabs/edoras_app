@@ -1,4 +1,4 @@
-/*
+/*******************************************************************************
 **
 **      GSC-18128-1, "Core Flight Executive Version 6.7"
 **
@@ -18,20 +18,29 @@
 **      See the License for the specific language governing permissions and
 **      limitations under the License.
 **
-*/
+** File: edoras_app_table.h
+**
+** Purpose:
+**  Define edoras app table
+**
+** Notes:
+**
+**
+*******************************************************************************/
+#ifndef _edoras_app_table_h_
+#define _edoras_app_table_h_
 
-#include "cfe_tbl_filedef.h" /* Required to obtain the CFE_TBL_FILEDEF macro definition */
-#include "gateway_app_table.h"
+/**
+ * Table structure
+ */
+typedef struct
+{
+   uint16 Int1;
+   uint16 Int2;
+} RoverAppTable_t;
 
-// Example
-GatewayAppTable_t GatewayAppTable = {1,2};
+#endif /* _edoras_app_table_h_ */
 
-
-/*
-** The macro below identifies:
-**    1) the data structure type to use as the table image format
-**    2) the name of the table to be placed into the cFE Table File Header
-**    3) a brief description of the contents of the file image
-**    4) the desired name of the table image binary file that is cFE compatible
-*/
-CFE_TBL_FILEDEF(GatewayAppTable, GatewayApp.GatewayAppTable, Table Utility Test Table, gateway_app_tbl.tbl)
+/************************/
+/*  End of File Comment */
+/************************/

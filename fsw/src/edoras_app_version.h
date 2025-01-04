@@ -20,48 +20,48 @@
 **
 *************************************************************************/
 
-/*! @file gateway_app_version.h
+/*! @file edoras_app_version.h
  * @brief Purpose:
  *
- *  The GatewayApp header file containing version information
+ *  The EdorasApp header file containing version information
  *
  */
 
-#ifndef GATEWAY_APP_VERSION_H
-#define GATEWAY_APP_VERSION_H
+#ifndef EDORAS_APP_VERSION_H
+#define EDORAS_APP_VERSION_H
 
 /* Development Build Macro Definitions */
 
-#define GATEWAY_APP_BUILD_NUMBER 2 /*!< Development Build: Number of commits since baseline */
-#define GATEWAY_APP_BUILD_BASELINE \
+#define EDORAS_APP_BUILD_NUMBER 2 /*!< Development Build: Number of commits since baseline */
+#define EDORAS_APP_BUILD_BASELINE \
     "v1.2.0-rc1" /*!< Development Build: git tag that is the base for the current development */
 
 /* Version Macro Definitions */
 
-#define GATEWAY_APP_MAJOR_VERSION 1  /*!< @brief ONLY APPLY for OFFICIAL releases. Major version number. */
-#define GATEWAY_APP_MINOR_VERSION 1  /*!< @brief ONLY APPLY for OFFICIAL releases. Minor version number. */
-#define GATEWAY_APP_REVISION      99 /*!< @brief ONLY APPLY for OFFICIAL releases. Revision version number. */
-#define GATEWAY_APP_MISSION_REV   0  /*!< @brief ONLY USED by MISSION Implementations. Mission revision */
+#define EDORAS_APP_MAJOR_VERSION 1  /*!< @brief ONLY APPLY for OFFICIAL releases. Major version number. */
+#define EDORAS_APP_MINOR_VERSION 1  /*!< @brief ONLY APPLY for OFFICIAL releases. Minor version number. */
+#define EDORAS_APP_REVISION      99 /*!< @brief ONLY APPLY for OFFICIAL releases. Revision version number. */
+#define EDORAS_APP_MISSION_REV   0  /*!< @brief ONLY USED by MISSION Implementations. Mission revision */
 
-#define GATEWAY_APP_STR_HELPER(x) #x /*!< @brief Helper function to concatenate strings from integer macros */
-#define GATEWAY_APP_STR(x) \
-    GATEWAY_APP_STR_HELPER(x) /*!< @brief Helper function to concatenate strings from integer macros */
+#define EDORAS_APP_STR_HELPER(x) #x /*!< @brief Helper function to concatenate strings from integer macros */
+#define EDORAS_APP_STR(x) \
+    EDORAS_APP_STR_HELPER(x) /*!< @brief Helper function to concatenate strings from integer macros */
 
 /*! @brief Development Build Version Number.
  * @details Baseline git tag + Number of commits since baseline. @n
  * See @ref cfsversions for format differences between development and release versions.
  */
-#define GATEWAY_APP_VERSION GATEWAY_APP_BUILD_BASELINE "+dev" GATEWAY_APP_STR(GATEWAY_APP_BUILD_NUMBER)
+#define EDORAS_APP_VERSION EDORAS_APP_BUILD_BASELINE "+dev" EDORAS_APP_STR(EDORAS_APP_BUILD_NUMBER)
 
 /*! @brief Development Build Version String.
  * @details Reports the current development build's baseline, number, and name. Also includes a note about the latest
  * official version. @n See @ref cfsversions for format differences between development and release versions.
  */
-#define GATEWAY_APP_VERSION_STRING                       \
-    " GATEWAY APP DEVELOPMENT BUILD " GATEWAY_APP_VERSION \
+#define EDORAS_APP_VERSION_STRING                       \
+    " GATEWAY APP DEVELOPMENT BUILD " EDORAS_APP_VERSION \
     ", Last Official Release: v1.1.0" /* For full support please use this version */
 
-#endif /* GATEWAY_APP_VERSION_H */
+#endif /* EDORAS_APP_VERSION_H */
 
 /************************/
 /*  End of File Comment */

@@ -1,4 +1,4 @@
-/************************************************************************
+/*
 **
 **      GSC-18128-1, "Core Flight Executive Version 6.7"
 **
@@ -18,30 +18,20 @@
 **      See the License for the specific language governing permissions and
 **      limitations under the License.
 **
-** File: gateway_app_events.h
-**
-** Purpose:
-**  Define Rover App Events IDs
-**
-** Notes:
-**
-*************************************************************************/
-#ifndef _gateway_app_events_h_
-#define _gateway_app_events_h_
+*/
 
-#define GATEWAY_APP_RESERVED_EID          0
-#define GATEWAY_APP_STARTUP_INF_EID       1
-#define GATEWAY_APP_COMMAND_ERR_EID       2
-#define GATEWAY_APP_COMMANDNOP_INF_EID    3
-#define GATEWAY_APP_COMMANDTWIST_INF_EID    4
-#define GATEWAY_APP_INVALID_MSGID_ERR_EID 5
-#define GATEWAY_APP_LEN_ERR_EID           6
-#define GATEWAY_APP_PIPE_ERR_EID          7
+#include "cfe_tbl_filedef.h" /* Required to obtain the CFE_TBL_FILEDEF macro definition */
+#include "edoras_app_table.h"
 
-#define GATEWAY_APP_EVENT_COUNTS 7
+// Example
+EdorasAppTable_t EdorasAppTable = {1,2};
 
-#endif /* _gateway_app_events_h_ */
 
-/************************/
-/*  End of File Comment */
-/************************/
+/*
+** The macro below identifies:
+**    1) the data structure type to use as the table image format
+**    2) the name of the table to be placed into the cFE Table File Header
+**    3) a brief description of the contents of the file image
+**    4) the desired name of the table image binary file that is cFE compatible
+*/
+CFE_TBL_FILEDEF(EdorasAppTable, EdorasApp.EdorasAppTable, Table Utility Test Table, edoras_app_tbl.tbl)

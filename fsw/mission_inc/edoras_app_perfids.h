@@ -18,20 +18,20 @@
 **      See the License for the specific language governing permissions and
 **      limitations under the License.
 **
-** File: gateway_app_perfids.h
+** File: edoras_app_perfids.h
 **
 ** Purpose:
-**  Define Gateway App Performance IDs
+**  Define Edoras App Performance IDs
 **
 ** Notes:
 **
 *************************************************************************/
-#ifndef _gateway_app_perfids_h_
-#define _gateway_app_perfids_h_
+#ifndef _edoras_app_perfids_h_
+#define _edoras_app_perfids_h_
 
-#define GATEWAY_APP_PERF_ID 91
+#define EDORAS_APP_PERF_ID 91
 
-#endif /* _gateway_app_perfids_h_ */
+#endif /* _edoras_app_perfids_h_ */
 
 /************************/
 /*  End of File Comment */

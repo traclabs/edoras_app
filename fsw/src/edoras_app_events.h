@@ -18,29 +18,30 @@
 **      See the License for the specific language governing permissions and
 **      limitations under the License.
 **
-** File: gateway_app_msgids.h
+** File: edoras_app_events.h
 **
 ** Purpose:
-**  Define Gateway App Message IDs
+**  Define Rover App Events IDs
 **
 ** Notes:
 **
-**
 *************************************************************************/
-#ifndef _gateway_app_msgids_h_
-#define _gateway_app_msgids_h_
+#ifndef _edoras_app_events_h_
+#define _edoras_app_events_h_
 
-#include "cfe_msgids.h"
+#define EDORAS_APP_RESERVED_EID          0
+#define EDORAS_APP_STARTUP_INF_EID       1
+#define EDORAS_APP_COMMAND_ERR_EID       2
+#define EDORAS_APP_COMMANDNOP_INF_EID    3
+#define EDORAS_APP_COMMANDTWIST_INF_EID    4
+#define EDORAS_APP_INVALID_MSGID_ERR_EID 5
+#define EDORAS_APP_LEN_ERR_EID           6
+#define EDORAS_APP_PIPE_ERR_EID          7
 
-#define GATEWAY_APP_CMD_MID     (CFE_PLATFORM_CMD_MID_BASE + 0x27)
-#define GATEWAY_APP_SEND_HK_MID (CFE_PLATFORM_CMD_MID_BASE + 0x28)
-#define GATEWAY_APP_CMD_ODOM_MID (CFE_PLATFORM_CMD_MID_BASE + 0x29)
+#define EDORAS_APP_EVENT_COUNTS 7
 
-#define GATEWAY_APP_HK_TLM_MID      (CFE_PLATFORM_TLM_MID_BASE + 0x26)
-#define GATEWAY_APP_TLM_MID   (CFE_PLATFORM_TLM_MID_BASE + 0x27)
-#define GATEWAY_APP_HR_CONTROL_MID  (CFE_PLATFORM_TLM_MID_BASE + 0x28)
-#endif /* _gateway_app_msgids_h_ */
+#endif /* _edoras_app_events_h_ */
 
-/*********************************/
-/* End of File Comment           */
-/*********************************/
+/************************/
+/*  End of File Comment */
+/************************/
