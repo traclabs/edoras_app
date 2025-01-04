@@ -1,7 +1,7 @@
 /**
- * @file robot_comm_udp_rover.c
+ * @file robot_comm_udp_gateway_big_arm.c
  */
-#include "robot_comm_udp_rover.h"
+#include "robot_comm_udp_gateway_big_arm.h"
 
 #include <arpa/inet.h>
 #include <string.h>
@@ -40,24 +40,24 @@ bool setupComm( CommData_t* _cd, int _cfs_port, int _robot_port)
   return true;
 }
 
-bool sendTwistCmd( CommData_t* _cd, double _lin_x, double _lin_y, double _lin_z, double _ang_x, double _ang_y, double _ang_z)
+bool sendPoseCmd( CommData_t* _cd, double _pos_x, double _pos_y, double _pos_z, double _orient_x, double _orient_y, double _orient_z, double _orient_w)
 {
     uint8_t* buf     = NULL;
-    double   twist_data[6] = {_lin_x, _lin_y, _lin_z, _ang_x, _ang_y, _ang_z};
-    size_t   bufSize = 6*sizeof(double);
+    double   pose_data[7] = {_pos_x, _pos_y, _pos_z, _orient_x, _orient_y, _orient_z, _orient_w};
+    size_t   bufSize = 7*sizeof(double);
     
     buf = (uint8_t*)malloc(bufSize);
     size_t offset = 0;
-    for(int i = 0; i < 6; ++i)
+    for(int i = 0; i < 7; ++i)
     {
-      memcpy(buf + offset, &twist_data[i], sizeof(double));
+      memcpy(buf + offset, &pose_data[i], sizeof(double));
       offset += sizeof(double);
     }
  
    // DEBUG
    size_t ofi = 0;
-   printf("* Twist command to be sent: ");
-   for(int i =0; i < 6; ++i)
+   printf("* Pose command to be sent: ");
+   for(int i =0; i < 7; ++i)
    {
       double val;
       memcpy(&val, buf + ofi, sizeof(double));
@@ -76,7 +76,7 @@ bool sendTwistCmd( CommData_t* _cd, double _lin_x, double _lin_y, double _lin_z,
 /**
  * @function receivePoseTlm
  */
-bool receivePoseTlm(CommData_t* _cd, double _position[3], double _orientation[4])
+bool receiveJointStateTlm(CommData_t* _cd, double _js[7])
 {
      ssize_t buffer_rcvd_size; 
      const int MAXLINE = 1024;
@@ -87,20 +87,17 @@ bool receivePoseTlm(CommData_t* _cd, double _position[3], double _orientation[4]
     buffer_rcvd_size = recvfrom(_cd->sock_fd, (uint8_t*) buffer_rcvd, MAXLINE, MSG_DONTWAIT, (struct sockaddr*)NULL, NULL);
     if(buffer_rcvd_size > 0)
     {
-      double data[7];
       size_t offset = 0;
+      // Fill fields
       for(int i = 0; i < 7; ++i)  
       {
-       memcpy(&data[i], bp + offset, sizeof(double));
+       memcpy(&_js[i], bp + offset, sizeof(double));
        offset += sizeof(double);
       }
 
-      // Fill fields
-      _position[0] = data[0]; _position[1] = data[1]; _position[2] = data[2];
-      _orientation[0] = data[3]; _orientation[1] = data[4]; _orientation[2] = data[5]; _orientation[3] = data[6];
 
-     printf("* Tlm pose received from robot: %f %f %f -- %f %f %f %f \n", _position[0], _position[1], _position[2], 
-        _orientation[0], _orientation[1], _orientation[2], _orientation[3]);
+     printf("* Tlm pose received from robot: %f %f %f %f %f %f %f \n", _js[0], _js[1], _js[2], 
+        _js[3], _js[4], _js[5], _js[6]);
      
       return true;  
     }

@@ -20,30 +20,27 @@
 #include <math.h>
 
 // To communicate with the actual robot locally
-#include "robot_comm_udp_rover.h"
+#include "robot_comm_udp_gateway_big_arm.h"
 
 #define ROBOT_PORT 8585
 #define CFS_PORT 8080
 
 
-/*
-** global data
-*/
-EdorasAppData_t EdorasAppData;
-EdorasAppOdometry_t lastOdomMsg;
-
 CommData_t commData;
 
-ParseData_t parse_pose_;
-ParseData_t parse_twist_;
+ParseData_t parse_pose_; // Receive command
+ParseData_t parse_joint_state_; // Send telemetry
 
 typedef struct
 {
     CFE_MSG_TelemetryHeader_t  TlmHeader;
-    uint8_t data[76]; // 56 for c ros struct, 76 serialized
-} PoseData_t;
+    uint8_t data[260]; // 56 for c ros struct, 76 serialized
+} JointStateData_t;
 
-PoseData_t tlm_pose;
+JointStateData_t tlm_joint_state;
+
+// To delete
+EdorasAppData_t EdorasAppData;
 
 void HighRateControlLoop(void);
 
@@ -56,9 +53,6 @@ void EdorasAppMain(void)
     int32            status;
     CFE_SB_Buffer_t *SBBufPtr;
 
-    /*
-    ** Create the first Performance Log entry
-    */
     CFE_ES_PerfLogEntry(EDORAS_APP_PERF_ID);
 
     /*
@@ -97,13 +91,9 @@ void EdorasAppMain(void)
         {
             CFE_EVS_SendEvent(EDORAS_APP_PIPE_ERR_EID, CFE_EVS_EventType_ERROR,
                               "Edoras App: SB Pipe Read Error, App Will Exit");
-            printf("RUN STATUS APP ERROR!!!!!! ********* !!!!!!!!!!! \n");   
             EdorasAppData.RunStatus = CFE_ES_RunStatus_APP_ERROR;
         }
 
-        /*
-        ** Performance Log Entry Stamp
-        */
         CFE_ES_PerfLogEntry(EDORAS_APP_PERF_ID);
     }
 
@@ -112,8 +102,11 @@ void EdorasAppMain(void)
 
     CFE_ES_ExitApp(EdorasAppData.RunStatus);
 
-} /* End of EdorasAppMain() */
+}
 
+/**
+ * @function initializeParserData
+ */
 void initializeParseData(const char* _interface_name, const char* _interface_type, ParseData_t *_parse_data )
 {
     _parse_data->interface_type = _interface_name;
@@ -124,6 +117,9 @@ void initializeParseData(const char* _interface_name, const char* _interface_typ
     _parse_data->ts = get_type_support(_parse_data->interface_type, _parse_data->interface_name, _parse_data->ts_library);
 }
 
+/**
+ * @function getSizeWithTlmHeader
+ */
 size_t getSizeWithTlmHeader(ParseData_t *_parse_data)
 {
    size_t size_msg = _parse_data->ti->size_of_;
@@ -140,7 +136,7 @@ int32 EdorasAppInit(void)
 {
     // Init ROS message stuff
     initializeParseData("geometry_msgs", "Pose", &parse_pose_);
-    initializeParseData("geometry_msgs", "Twist", &parse_twist_);
+    initializeParseData("sensor_msgs", "JointState", &parse_joint_state_);
 
     int32 status;
 
@@ -188,7 +184,7 @@ int32 EdorasAppInit(void)
     // Initialize housekeeping packet (clear user data area).
     CFE_MSG_Init(&EdorasAppData.HkTlm.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_HK_TLM_MID), sizeof(EdorasAppData.HkTlm));
 
-    CFE_MSG_Init(&tlm_pose.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TLM_MID), sizeof(tlm_pose) );
+    CFE_MSG_Init(&tlm_joint_state.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TLM_MID), sizeof(tlm_joint_state) );
 
     // Create Software Bus message pipe.
     status = CFE_SB_CreatePipe(&EdorasAppData.CommandPipe, EdorasAppData.PipeDepth, EdorasAppData.PipeName);
@@ -329,17 +325,22 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
         offset = 8;
         uint8_t* msg_pointer = NULL;
         size_t buffer_size;
-        msg_pointer = from_uint_buffer_to_msg_pointer( (uint8_t*)SBBufPtr, offset, parse_twist_.ts, parse_twist_.ti, &buffer_size);
+        msg_pointer = from_uint_buffer_to_msg_pointer( (uint8_t*)SBBufPtr, offset, parse_pose_.ts, parse_pose_.ti, &buffer_size);
         
         // Get data
-        double vel_lin, vel_ang;
-        get_float64(msg_pointer, parse_twist_.ti, "linear.x", &vel_lin);
-        get_float64(msg_pointer, parse_twist_.ti, "angular.z", &vel_ang);        
+        double pos_x, pos_y, pos_z, orient_x, orient_y, orient_z, orient_w;
+        get_float64(msg_pointer, parse_pose_.ti, "position.x", &pos_x);
+        get_float64(msg_pointer, parse_pose_.ti, "position.y", &pos_y);
+        get_float64(msg_pointer, parse_pose_.ti, "position.z", &pos_z);
+        get_float64(msg_pointer, parse_pose_.ti, "orientation.x", &orient_x);
+        get_float64(msg_pointer, parse_pose_.ti, "orientation.y", &orient_y);
+        get_float64(msg_pointer, parse_pose_.ti, "orientation.z", &orient_z);
+        get_float64(msg_pointer, parse_pose_.ti, "orientation.w", &orient_w);                                
         //debug_parse_buffer(msg_pointer, parse_twist_.ti);
         //printf("Reading linear velocity: %f and angular : %f \n", vel_lin, vel_ang);
         
         // Send data to robot!!!
-        sendTwistCmd(&commData, vel_lin, 0, 0, 0, 0, vel_ang);
+        sendPoseCmd(&commData, pos_x, pos_y, pos_z, orient_x, orient_y, orient_z, orient_w);
        }
              break;
 
@@ -371,10 +372,7 @@ void EdorasAppProcessFlightOdom(CFE_SB_Buffer_t *SBBufPtr)
     // Read
     if (EdorasAppVerifyCmdLength(&SBBufPtr->Msg, sizeof(EdorasAppCmdRobotState_t)))
     {
-       EdorasAppCmdRobotState_t* state = (EdorasAppCmdRobotState_t *)SBBufPtr;
-       
-       // Fill the lastState
-       lastOdomMsg = state->odom;                     
+       //EdorasAppCmdRobotState_t* state = (EdorasAppCmdRobotState_t *)SBBufPtr;   
     }
 
 
@@ -396,57 +394,68 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
 {
     { 
      // Read telemetry, if any
-     double pos[3]; double orient[4];
+     double joints[7];
                     
-     if(!receivePoseTlm(&commData, pos, orient))
+     if(!receiveJointStateTlm(&commData, joints))
        return CFE_SUCCESS;
        
      // If data received from robot update telemetry data
      // to send back to ground
-     uint8_t* pose_msg = create_msg(parse_pose_.ti);
+     uint8_t* js_msg = create_msg(parse_joint_state_.ti);
 
      // Fill data
-     set_float64(pose_msg, parse_pose_.ti, "position.x", pos[0]);
-     set_float64(pose_msg, parse_pose_.ti, "position.y", pos[1]);
-     set_float64(pose_msg, parse_pose_.ti, "position.z", pos[2]);
+     resize_sequence(js_msg, parse_joint_state_.ti, "position", 7);
+          
+     set_float64(js_msg, parse_joint_state_.ti, "position.0", joints[0]);
+     set_float64(js_msg, parse_joint_state_.ti, "position.1", joints[1]);
+     set_float64(js_msg, parse_joint_state_.ti, "position.2", joints[2]);
+     set_float64(js_msg, parse_joint_state_.ti, "position.3", joints[3]);
+     set_float64(js_msg, parse_joint_state_.ti, "position.4", joints[4]);
+     set_float64(js_msg, parse_joint_state_.ti, "position.5", joints[5]);
+     set_float64(js_msg, parse_joint_state_.ti, "position.6", joints[6]);
 
-     set_float64(pose_msg, parse_pose_.ti, "orientation.x",  orient[0]);
-     set_float64(pose_msg, parse_pose_.ti, "orientation.y",  orient[1]);
-     set_float64(pose_msg, parse_pose_.ti, "orientation.z",  orient[2]);
-     set_float64(pose_msg, parse_pose_.ti, "orientation.w", orient[3]);
+     resize_sequence(js_msg, parse_joint_state_.ti, "name", 7);
+
+     set_const_char(js_msg, parse_joint_state_.ti, "name.0", "big_arm_joint_2");
+     set_const_char(js_msg, parse_joint_state_.ti, "name.1", "big_arm_joint_3");
+     set_const_char(js_msg, parse_joint_state_.ti, "name.2", "big_arm_joint_4");
+     set_const_char(js_msg, parse_joint_state_.ti, "name.3", "big_arm_joint_5");
+     set_const_char(js_msg, parse_joint_state_.ti, "name.4", "big_arm_joint_6");
+     set_const_char(js_msg, parse_joint_state_.ti, "name.5", "big_arm_joint_7");
+     set_const_char(js_msg, parse_joint_state_.ti, "name.6", "big_arm_joint_8");
 
      // DEBUG 
-     //debug_parse_buffer(pose_msg, parse_pose_.ti);
+     debug_parse_buffer(js_msg, parse_joint_state_.ti);
 
      // Convert data to serialized version
      uint8_t* tlm_data = NULL;
      size_t tlm_data_size;
-     tlm_data = from_msg_pointer_to_uint_buffer(pose_msg, parse_pose_.ts, parse_pose_.ti, &tlm_data_size);
+     tlm_data = from_msg_pointer_to_uint_buffer(js_msg, parse_joint_state_.ts, parse_joint_state_.ti, &tlm_data_size);
      
-     //printf("Size of parse_pose element: %ld. Size of tlm header: %ld, size of Tlm data size: %ld \n", 
-     //       sizeof(tlm_pose), sizeof(CFE_MSG_TelemetryHeader_t), tlm_data_size);
+     printf("Size of parse_joint_state element: %ld. Size of tlm header: %ld, size of Tlm data size: %ld \n", 
+            sizeof(tlm_joint_state), sizeof(CFE_MSG_TelemetryHeader_t), tlm_data_size);
  
      // See header
      //printf("*** Tlm Header sent to ground: ");
      //for(size_t i = 0; i < 8; i++)
-     //   printf("%02x ", tlm_pose.TlmHeader.Msg.Byte[i]);     
+     //   printf("%02x ", tlm_joint_state.TlmHeader.Msg.Byte[i]);     
      //printf("\n");
 
      // Fill
      for(size_t i = 0; i < tlm_data_size; i++)
-        memcpy(&tlm_pose.data[i], (uint8_t*)(tlm_data) + i, sizeof(uint8_t)); 
+        memcpy(&tlm_joint_state.data[i], (uint8_t*)(tlm_data) + i, sizeof(uint8_t)); 
     
      // Debug
      //printBuffer(tlm_data, tlm_data_size, "Data to send back to ground: ");
      
-     CFE_SB_TimeStampMsg(&tlm_pose.TlmHeader.Msg);
+     CFE_SB_TimeStampMsg(&tlm_joint_state.TlmHeader.Msg);
      // update_header: If true, the sequence counter bit in the primary header will increase each time
      // If false, it will remain zero.
      bool update_header = true;
-     CFE_SB_TransmitMsg(&tlm_pose.TlmHeader.Msg, update_header); 
+     CFE_SB_TransmitMsg(&tlm_joint_state.TlmHeader.Msg, update_header); 
      
      // Clean up
-     free(pose_msg);
+     free(js_msg);
      free(tlm_data);
     }
  
@@ -501,13 +510,13 @@ int32 EdorasAppCmdTwist(const EdorasAppTwistCmd_t *Msg)
 void HighRateControlLoop(void) {
         
     // 2. Update the telemetry information        
-    EdorasAppOdometry_t *st = &lastOdomMsg; //EdorasAppGoal.StateTlm;
+    //EdorasAppOdometry_t *st = &lastOdomMsg; //EdorasAppGoal.StateTlm;
 
-    EdorasAppData.HkTlm.Payload.state.pose.x = st->pose.x;
-    EdorasAppData.HkTlm.Payload.state.pose.y = st->pose.y;
+    //EdorasAppData.HkTlm.Payload.state.pose.x = st->pose.x;
+    //EdorasAppData.HkTlm.Payload.state.pose.y = st->pose.y;
 
-    EdorasAppData.HkTlm.Payload.state.twist.linear_x = st->twist.linear_x;
-    EdorasAppData.HkTlm.Payload.state.twist.linear_y = st->twist.linear_y;
+    //EdorasAppData.HkTlm.Payload.state.twist.linear_x = st->twist.linear_x;
+    //EdorasAppData.HkTlm.Payload.state.twist.linear_y = st->twist.linear_y;
 
     // This data is sent when a Housekeeping request is received, 
     // (usually, at a low rate) so nothing sent here
