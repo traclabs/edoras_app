@@ -40,7 +40,8 @@ bool setupComm( CommData_t* _cd, int _cfs_port, int _robot_port)
   return true;
 }
 
-bool sendTwistCmd( CommData_t* _cd, double _lin_x, double _lin_y, double _lin_z, double _ang_x, double _ang_y, double _ang_z)
+bool sendTwistCmd( CommData_t* _cd, double _lin_x, double _lin_y, double _lin_z, 
+                   double _ang_x, double _ang_y, double _ang_z)
 {
     uint8_t* buf     = NULL;
     double   twist_data[6] = {_lin_x, _lin_y, _lin_z, _ang_x, _ang_y, _ang_z};
@@ -76,7 +77,8 @@ bool sendTwistCmd( CommData_t* _cd, double _lin_x, double _lin_y, double _lin_z,
 /**
  * @function receivePoseTlm
  */
-bool receivePoseTlm(CommData_t* _cd, double _position[3], double _orientation[4])
+bool receivePoseTlm(CommData_t* _cd, double _position[3], double _orientation[4],
+                    int32_t* _sec, uint32_t* _nanosec )
 {
      ssize_t buffer_rcvd_size; 
      const int MAXLINE = 1024;
@@ -87,20 +89,29 @@ bool receivePoseTlm(CommData_t* _cd, double _position[3], double _orientation[4]
     buffer_rcvd_size = recvfrom(_cd->sock_fd, (uint8_t*) buffer_rcvd, MAXLINE, MSG_DONTWAIT, (struct sockaddr*)NULL, NULL);
     if(buffer_rcvd_size > 0)
     {
-      double data[7];
       size_t offset = 0;
-      for(int i = 0; i < 7; ++i)  
+      for(int i = 0; i < 3; i++)  
       {
-       memcpy(&data[i], bp + offset, sizeof(double));
+       memcpy(&_position[i], bp + offset, sizeof(double));
+       offset += sizeof(double);
+      }
+      for(int i = 0; i < 4; i++)  
+      {
+       memcpy(&_orientation[i], bp + offset, sizeof(double));
        offset += sizeof(double);
       }
 
-      // Fill fields
-      _position[0] = data[0]; _position[1] = data[1]; _position[2] = data[2];
-      _orientation[0] = data[3]; _orientation[1] = data[4]; _orientation[2] = data[5]; _orientation[3] = data[6];
+      // Sec
+      memcpy(_sec, bp + offset, sizeof(int32_t));
+      offset += sizeof(int32_t);
+      memcpy(_nanosec, bp + offset, sizeof(uint32_t));
+      offset += sizeof(uint32_t);
+    
 
-     printf("* Tlm pose received from robot: %f %f %f -- %f %f %f %f \n", _position[0], _position[1], _position[2], 
-        _orientation[0], _orientation[1], _orientation[2], _orientation[3]);
+     printf("* Tlm pose received from robot: %f %f %f -- %f %f %f %f . Time: sec: %d, nanosec: %d \n", 
+        _position[0], _position[1], _position[2], 
+        _orientation[0], _orientation[1], _orientation[2], _orientation[3],
+        *_sec, *_nanosec);
      
       return true;  
     }

@@ -25,12 +25,8 @@
 #define ROBOT_PORT 8585
 #define CFS_PORT 8080
 
-
-/*
-** global data
-*/
+// Global data
 EdorasAppData_t EdorasAppData;
-EdorasAppOdometry_t lastOdomMsg;
 
 CommData_t commData;
 
@@ -40,7 +36,7 @@ ParseData_t parse_twist_;
 typedef struct
 {
     CFE_MSG_TelemetryHeader_t  TlmHeader;
-    uint8_t data[76]; // 56 for c ros struct, 76 serialized
+    uint8_t data[100]; // 56 for c ros struct, 76 serialized
 } PoseData_t;
 
 PoseData_t tlm_pose;
@@ -56,20 +52,14 @@ void EdorasAppMain(void)
     int32            status;
     CFE_SB_Buffer_t *SBBufPtr;
 
-    /*
-    ** Create the first Performance Log entry
-    */
+    // Create the first Performance Log entry
     CFE_ES_PerfLogEntry(EDORAS_APP_PERF_ID);
 
-    /*
-    ** Perform application specific initialization
-    ** If the Initialization fails, set the RunStatus to
-    ** CFE_ES_RunStatus_APP_ERROR and the App will not enter the RunLoop
-    */
+    // Perform application specific initialization
     // 0: CFE_ES_RunStatus_UNDEFINED, 1: CFE_ES_RunStatus_APP_RUN, 2: CFE_ES_RunStatus_APP_EXIT, 3: CFE_ES_RunStatus_APP_ERROR
     status = EdorasAppInit();
     if (status != CFE_SUCCESS)
-    {   printf("Setting run status to be error !!!!!!XXXXXXXXXXXXX!!!!!!!\n");
+    {   printf("Setting run status to be error !!!!!!!!\n");
         EdorasAppData.RunStatus = CFE_ES_RunStatus_APP_ERROR;
     }
 
@@ -85,8 +75,7 @@ void EdorasAppMain(void)
         // Performance Log Exit Stamp
         CFE_ES_PerfLogExit(EDORAS_APP_PERF_ID);
 
-
-        /* Pend on receipt of command packet */
+        // Pend on receipt of command packet
         status = CFE_SB_ReceiveBuffer(&SBBufPtr, EdorasAppData.CommandPipe, CFE_SB_PEND_FOREVER);
 
         if (status == CFE_SUCCESS)
@@ -97,13 +86,10 @@ void EdorasAppMain(void)
         {
             CFE_EVS_SendEvent(EDORAS_APP_PIPE_ERR_EID, CFE_EVS_EventType_ERROR,
                               "Edoras App: SB Pipe Read Error, App Will Exit");
-            printf("RUN STATUS APP ERROR!!!!!! ********* !!!!!!!!!!! \n");   
             EdorasAppData.RunStatus = CFE_ES_RunStatus_APP_ERROR;
         }
 
-        /*
-        ** Performance Log Entry Stamp
-        */
+        // Performance Log Entry Stamp
         CFE_ES_PerfLogEntry(EDORAS_APP_PERF_ID);
     }
 
@@ -112,8 +98,11 @@ void EdorasAppMain(void)
 
     CFE_ES_ExitApp(EdorasAppData.RunStatus);
 
-} /* End of EdorasAppMain() */
+}
 
+/**
+ * @function initializeParseData
+ */
 void initializeParseData(const char* _interface_name, const char* _interface_type, ParseData_t *_parse_data )
 {
     _parse_data->interface_type = _interface_name;
@@ -139,7 +128,7 @@ size_t getSizeWithTlmHeader(ParseData_t *_parse_data)
 int32 EdorasAppInit(void)
 {
     // Init ROS message stuff
-    initializeParseData("geometry_msgs", "Pose", &parse_pose_);
+    initializeParseData("geometry_msgs", "PoseStamped", &parse_pose_);
     initializeParseData("geometry_msgs", "Twist", &parse_twist_);
 
     int32 status;
@@ -216,13 +205,12 @@ int32 EdorasAppInit(void)
     }
 
     // Subscribe to flight odom data
-    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_CMD_ODOM_MID), EdorasAppData.CommandPipe);
-    if (status != CFE_SUCCESS)
-    {
-        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Odom data, RC = 0x%08lX\n", (unsigned long)status);
-
-        return (status);
-    }
+    //status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_CMD_ODOM_MID), EdorasAppData.CommandPipe);
+    //if (status != CFE_SUCCESS)
+    //{
+    //    CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Odom data, RC = 0x%08lX\n", (unsigned long)status);
+    //    return (status);
+    //}
 
     
     // Subscribe to HR wakeup
@@ -236,20 +224,13 @@ int32 EdorasAppInit(void)
 
     CFE_EVS_SendEvent(EDORAS_APP_STARTUP_INF_EID, CFE_EVS_EventType_INFORMATION, "Edoras App Initialized.%s",
                       EDORAS_APP_VERSION_STRING);
-    printf("DEBUG -- Returning cfe success from init... \n");
-    return (CFE_SUCCESS);
 
+    return (CFE_SUCCESS);
 } 
 
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
-/*  Name:  EdorasAppProcessCommandPacket                                    */
-/*                                                                            */
-/*  Purpose:                                                                  */
-/*     This routine will process any packet that is received on the ros    */
-/*     command pipe.                                                          */
-/*                                                                            */
-/* * * * * * * * * * * * * * * * * * * * * * * *  * * * * * * *  * *  * * * * */
+/**
+ * @function:  EdorasAppProcessCommandPacket
+ */
 void EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
 {
     CFE_SB_MsgId_t MsgId = CFE_SB_INVALID_MSG_ID;
@@ -332,14 +313,20 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
         msg_pointer = from_uint_buffer_to_msg_pointer( (uint8_t*)SBBufPtr, offset, parse_twist_.ts, parse_twist_.ti, &buffer_size);
         
         // Get data
-        double vel_lin, vel_ang;
-        get_float64(msg_pointer, parse_twist_.ti, "linear.x", &vel_lin);
-        get_float64(msg_pointer, parse_twist_.ti, "angular.z", &vel_ang);        
-        //debug_parse_buffer(msg_pointer, parse_twist_.ti);
-        //printf("Reading linear velocity: %f and angular : %f \n", vel_lin, vel_ang);
+        double vel_lin[3];
+        double vel_ang[3];
+        get_float64(msg_pointer, parse_twist_.ti, "linear.x", &vel_lin[0]);
+        get_float64(msg_pointer, parse_twist_.ti, "linear.y", &vel_lin[1]);
+        get_float64(msg_pointer, parse_twist_.ti, "linear.z", &vel_lin[2]);
+        get_float64(msg_pointer, parse_twist_.ti, "angular.x", &vel_ang[0]);
+        get_float64(msg_pointer, parse_twist_.ti, "angular.y", &vel_ang[1]);                
+        get_float64(msg_pointer, parse_twist_.ti, "angular.z", &vel_ang[2]);
         
-        // Send data to robot!!!
-        sendTwistCmd(&commData, vel_lin, 0, 0, 0, 0, vel_ang);
+        //debug_parse_buffer(msg_pointer, parse_twist_.ti);
+        //printf("Reading linear velocity: %f %f %f and angular : %f %f %f \n", vel_lin[0], vel_lin[1], vel_lin[2], vel_ang[0], vel_ang[1], vel_ang[2]);
+        
+        // Send data to control robot!
+        sendTwistCmd(&commData, vel_lin[0], vel_lin[1], vel_lin[2], vel_ang[0], vel_ang[1], vel_ang[2]);
        }
              break;
 
@@ -355,11 +342,9 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 
 } /* End of EdorasAppProcessFlightOdom() */
 
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
-/*                                                                            */
-/* EdorasAppProcessFlightOdom() -- Edoras App flight odometry                   */
-/*                                                                            */
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
+/**
+ * @EdorasAppProcessFlightOdom() -- Edoras App flight odometry  
+ **/
 void EdorasAppProcessFlightOdom(CFE_SB_Buffer_t *SBBufPtr)
 {
     CFE_MSG_FcnCode_t CommandCode = 0;
@@ -371,34 +356,27 @@ void EdorasAppProcessFlightOdom(CFE_SB_Buffer_t *SBBufPtr)
     // Read
     if (EdorasAppVerifyCmdLength(&SBBufPtr->Msg, sizeof(EdorasAppCmdRobotState_t)))
     {
-       EdorasAppCmdRobotState_t* state = (EdorasAppCmdRobotState_t *)SBBufPtr;
+       //EdorasAppCmdRobotState_t* state = (EdorasAppCmdRobotState_t *)SBBufPtr;
        
        // Fill the lastState
-       lastOdomMsg = state->odom;                     
+       //lastOdomMsg = state->odom;                     
     }
 
-
     return;
+}
 
-} /* End of EdorasAppProcessFlightCommand() */
 
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
-/*  Name:  EdorasAppReportHousekeeping                                          */
-/*                                                                            */
-/*  Purpose:                                                                  */
-/*         This function is triggered in response to a task telemetry request */
-/*         from the housekeeping task. This function will gather the Apps     */
-/*         telemetry, packetize it and send it to the housekeeping task via   */
-/*         the software bus                                                   */
-/* * * * * * * * * * * * * * * * * * * * * * * *  * * * * * * *  * *  * * * * */
+/**
+ *  Name:  EdorasAppReportHousekeeping
+ */
 int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
 {
     { 
      // Read telemetry, if any
      double pos[3]; double orient[4];
+     int32_t sec; uint32_t nanosec;
                     
-     if(!receivePoseTlm(&commData, pos, orient))
+     if(!receivePoseTlm(&commData, pos, orient, &sec, &nanosec))
        return CFE_SUCCESS;
        
      // If data received from robot update telemetry data
@@ -406,25 +384,29 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
      uint8_t* pose_msg = create_msg(parse_pose_.ti);
 
      // Fill data
-     set_float64(pose_msg, parse_pose_.ti, "position.x", pos[0]);
-     set_float64(pose_msg, parse_pose_.ti, "position.y", pos[1]);
-     set_float64(pose_msg, parse_pose_.ti, "position.z", pos[2]);
+     set_float64(pose_msg, parse_pose_.ti, "pose.position.x", pos[0]);
+     set_float64(pose_msg, parse_pose_.ti, "pose.position.y", pos[1]);
+     set_float64(pose_msg, parse_pose_.ti, "pose.position.z", pos[2]);
 
-     set_float64(pose_msg, parse_pose_.ti, "orientation.x",  orient[0]);
-     set_float64(pose_msg, parse_pose_.ti, "orientation.y",  orient[1]);
-     set_float64(pose_msg, parse_pose_.ti, "orientation.z",  orient[2]);
-     set_float64(pose_msg, parse_pose_.ti, "orientation.w", orient[3]);
+     set_float64(pose_msg, parse_pose_.ti, "pose.orientation.x",  orient[0]);
+     set_float64(pose_msg, parse_pose_.ti, "pose.orientation.y",  orient[1]);
+     set_float64(pose_msg, parse_pose_.ti, "pose.orientation.z",  orient[2]);
+     set_float64(pose_msg, parse_pose_.ti, "pose.orientation.w", orient[3]);
 
+     set_int32(pose_msg, parse_pose_.ti, "header.stamp.sec", sec);
+     set_uint32(pose_msg, parse_pose_.ti, "header.stamp.nanosec", nanosec);
+     set_const_char(pose_msg, parse_pose_.ti, "header.frame_id", "world");
+               
      // DEBUG 
-     //debug_parse_buffer(pose_msg, parse_pose_.ti);
+     debug_parse_buffer(pose_msg, parse_pose_.ti);
 
      // Convert data to serialized version
      uint8_t* tlm_data = NULL;
      size_t tlm_data_size;
      tlm_data = from_msg_pointer_to_uint_buffer(pose_msg, parse_pose_.ts, parse_pose_.ti, &tlm_data_size);
      
-     //printf("Size of parse_pose element: %ld. Size of tlm header: %ld, size of Tlm data size: %ld \n", 
-     //       sizeof(tlm_pose), sizeof(CFE_MSG_TelemetryHeader_t), tlm_data_size);
+     printf("Size of parse_pose element: %ld. Size of tlm header: %ld, size of Tlm data size: %ld \n", 
+            sizeof(tlm_pose), sizeof(CFE_MSG_TelemetryHeader_t), tlm_data_size);
  
      // See header
      //printf("*** Tlm Header sent to ground: ");
@@ -501,13 +483,13 @@ int32 EdorasAppCmdTwist(const EdorasAppTwistCmd_t *Msg)
 void HighRateControlLoop(void) {
         
     // 2. Update the telemetry information        
-    EdorasAppOdometry_t *st = &lastOdomMsg; //EdorasAppGoal.StateTlm;
+    //EdorasAppOdometry_t *st = &lastOdomMsg; //EdorasAppGoal.StateTlm;
 
-    EdorasAppData.HkTlm.Payload.state.pose.x = st->pose.x;
+    /*EdorasAppData.HkTlm.Payload.state.pose.x = st->pose.x;
     EdorasAppData.HkTlm.Payload.state.pose.y = st->pose.y;
 
     EdorasAppData.HkTlm.Payload.state.twist.linear_x = st->twist.linear_x;
-    EdorasAppData.HkTlm.Payload.state.twist.linear_y = st->twist.linear_y;
+    EdorasAppData.HkTlm.Payload.state.twist.linear_y = st->twist.linear_y;*/
 
     // This data is sent when a Housekeeping request is received, 
     // (usually, at a low rate) so nothing sent here
