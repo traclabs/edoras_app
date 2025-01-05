@@ -4,7 +4,7 @@ include_directories(fsw/mission_inc)
 include_directories(fsw/platform_inc)
 #include_directories(${edoras_app_MISSION_DIR}/fsw/platform_inc) # ros_app?
 
-set(edoras_core_DIR $ENV{HOME}/local/lib/cmake/edoras_core)
+set(edoras_core_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../edoras_core/install/lib/cmake/edoras_core)
 find_package(edoras_core REQUIRED)
 
  
