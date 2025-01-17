@@ -20,10 +20,20 @@
 #include <math.h>
 
 // To communicate with the actual robot locally
-#include "robot_comm_udp_rover.h"
+#define MULTIHOST 
 
 #define ROBOT_PORT 8585
 #define CFS_PORT 8080
+
+#ifdef MULTIHOST
+#define ROBOT_IP "10.5.0.4" // rosfsw
+#define CFS_IP "10.5.0.3"  // fsw
+#else
+#define ROBOT_IP "127.0.0.1" // rosfsw
+#define CFS_IP "127.0.0.1"  // fsw
+#endif
+
+#include "robot_comm_udp_rover.h"
 
 // Global data
 EdorasAppData_t EdorasAppData;
@@ -64,7 +74,8 @@ void EdorasAppMain(void)
     }
 
     // Start comm
-    if(!setupComm(&commData, CFS_PORT, ROBOT_PORT))
+    CFE_ES_WriteToSysLog("Edoras App: Starting communication cfs port: %d ip: %s robot port: %d ip: %s ******* \n", CFS_PORT, CFS_IP, ROBOT_PORT, ROBOT_IP);
+    if(!setupComm(&commData, CFS_PORT, ROBOT_PORT, CFS_IP, ROBOT_IP))
     {
        perror("Error setting up communication to the robot using sockets");
     }

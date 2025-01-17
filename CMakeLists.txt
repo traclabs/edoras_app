@@ -6,9 +6,7 @@ include_directories(fsw/platform_inc)
 
 set(edoras_core_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../edoras_core/install/lib/cmake/edoras_core)
 find_package(edoras_core REQUIRED)
-
- 
-# Create library for talking to robot using sockets
+  
 add_library(robot_comm_udp_rover fsw/src/robot_comm_udp_rover.c)
 
 # Create the app module
