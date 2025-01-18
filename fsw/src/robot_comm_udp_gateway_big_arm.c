@@ -7,7 +7,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-bool setupComm( CommData_t* _cd, int _cfs_port, int _robot_port)
+bool setupComm( CommData_t* _cd, int _cfs_port, int _robot_port, const char* _cfs_ip, const char* _robot_ip)
 {
  // Create socket
  _cd->sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -22,7 +22,7 @@ bool setupComm( CommData_t* _cd, int _cfs_port, int _robot_port)
   
   // Fill server information
   _cd->own_address.sin_family = AF_INET;
-  _cd->own_address.sin_addr.s_addr = inet_addr("127.0.0.1"); //INADDR_ANY;
+  _cd->own_address.sin_addr.s_addr = inet_addr(_cfs_ip); //inet_addr("127.0.0.1"); //INADDR_ANY;
   _cd->own_address.sin_port = htons(_cfs_port);
   
   // Bind the socket
@@ -34,7 +34,7 @@ bool setupComm( CommData_t* _cd, int _cfs_port, int _robot_port)
   }
   
   _cd->other_address.sin_family = AF_INET;
-  _cd->other_address.sin_addr.s_addr = inet_addr("127.0.0.1"); //INADDR_ANY;
+  _cd->other_address.sin_addr.s_addr = inet_addr(_robot_ip); //inet_addr("127.0.0.1"); //INADDR_ANY;
   _cd->other_address.sin_port = htons(_robot_port);
   
   return true;

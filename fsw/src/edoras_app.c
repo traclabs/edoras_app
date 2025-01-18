@@ -19,12 +19,23 @@
 
 #include <math.h>
 
-// To communicate with the actual robot locally
-#include "robot_comm_udp_gateway_big_arm.h"
+#define MULTIHOST 
 
 #define ROBOT_PORT 8585
 #define CFS_PORT 8080
 
+#ifdef MULTIHOST
+#define ROBOT_IP "10.5.0.4" // rosfsw
+#define CFS_IP "10.5.0.3"  // fsw
+#else
+#define ROBOT_IP "127.0.0.1" // rosfsw
+#define CFS_IP "127.0.0.1"  // fsw
+#endif
+
+#include "robot_comm_udp_gateway_big_arm.h"
+
+// Global data
+EdorasAppData_t EdorasAppData;
 
 CommData_t commData;
 
@@ -53,22 +64,20 @@ void EdorasAppMain(void)
     int32            status;
     CFE_SB_Buffer_t *SBBufPtr;
 
+    // Create the first Performance Log entry
     CFE_ES_PerfLogEntry(EDORAS_APP_PERF_ID);
 
-    /*
-    ** Perform application specific initialization
-    ** If the Initialization fails, set the RunStatus to
-    ** CFE_ES_RunStatus_APP_ERROR and the App will not enter the RunLoop
-    */
+    // Perform application specific initialization
     // 0: CFE_ES_RunStatus_UNDEFINED, 1: CFE_ES_RunStatus_APP_RUN, 2: CFE_ES_RunStatus_APP_EXIT, 3: CFE_ES_RunStatus_APP_ERROR
     status = EdorasAppInit();
     if (status != CFE_SUCCESS)
-    {   printf("Setting run status to be error !!!!!!XXXXXXXXXXXXX!!!!!!!\n");
+    {   printf("Setting run status to be error !!!!!!!!\n");
         EdorasAppData.RunStatus = CFE_ES_RunStatus_APP_ERROR;
     }
 
     // Start comm
-    if(!setupComm(&commData, CFS_PORT, ROBOT_PORT))
+    CFE_ES_WriteToSysLog("Edoras App: Starting communication cfs port: %d ip: %s robot port: %d ip: %s ******* \n", CFS_PORT, CFS_IP, ROBOT_PORT, ROBOT_IP);
+    if(!setupComm(&commData, CFS_PORT, ROBOT_PORT, CFS_IP, ROBOT_IP))
     {
        perror("Error setting up communication to the robot using sockets");
     }
@@ -79,8 +88,7 @@ void EdorasAppMain(void)
         // Performance Log Exit Stamp
         CFE_ES_PerfLogExit(EDORAS_APP_PERF_ID);
 
-
-        /* Pend on receipt of command packet */
+        // Pend on receipt of command packet
         status = CFE_SB_ReceiveBuffer(&SBBufPtr, EdorasAppData.CommandPipe, CFE_SB_PEND_FOREVER);
 
         if (status == CFE_SUCCESS)
@@ -94,6 +102,7 @@ void EdorasAppMain(void)
             EdorasAppData.RunStatus = CFE_ES_RunStatus_APP_ERROR;
         }
 
+        // Performance Log Entry Stamp
         CFE_ES_PerfLogEntry(EDORAS_APP_PERF_ID);
     }
 
@@ -105,7 +114,7 @@ void EdorasAppMain(void)
 }
 
 /**
- * @function initializeParserData
+ * @function initializeParseData
  */
 void initializeParseData(const char* _interface_name, const char* _interface_type, ParseData_t *_parse_data )
 {
@@ -212,13 +221,12 @@ int32 EdorasAppInit(void)
     }
 
     // Subscribe to flight odom data
-    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_CMD_ODOM_MID), EdorasAppData.CommandPipe);
-    if (status != CFE_SUCCESS)
-    {
-        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Odom data, RC = 0x%08lX\n", (unsigned long)status);
-
-        return (status);
-    }
+    //status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_CMD_ODOM_MID), EdorasAppData.CommandPipe);
+    //if (status != CFE_SUCCESS)
+    //{
+    //    CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Odom data, RC = 0x%08lX\n", (unsigned long)status);
+    //    return (status);
+    //}
 
     
     // Subscribe to HR wakeup
@@ -232,20 +240,13 @@ int32 EdorasAppInit(void)
 
     CFE_EVS_SendEvent(EDORAS_APP_STARTUP_INF_EID, CFE_EVS_EventType_INFORMATION, "Edoras App Initialized.%s",
                       EDORAS_APP_VERSION_STRING);
-    printf("DEBUG -- Returning cfe success from init... \n");
-    return (CFE_SUCCESS);
 
+    return (CFE_SUCCESS);
 } 
 
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
-/*  Name:  EdorasAppProcessCommandPacket                                    */
-/*                                                                            */
-/*  Purpose:                                                                  */
-/*     This routine will process any packet that is received on the ros    */
-/*     command pipe.                                                          */
-/*                                                                            */
-/* * * * * * * * * * * * * * * * * * * * * * * *  * * * * * * *  * *  * * * * */
+/**
+ * @function:  EdorasAppProcessCommandPacket
+ */
 void EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
 {
     CFE_SB_MsgId_t MsgId = CFE_SB_INVALID_MSG_ID;
@@ -356,11 +357,9 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 
 } /* End of EdorasAppProcessFlightOdom() */
 
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
-/*                                                                            */
-/* EdorasAppProcessFlightOdom() -- Edoras App flight odometry                   */
-/*                                                                            */
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
+/**
+ * @EdorasAppProcessFlightOdom() -- Edoras App flight odometry  
+ **/
 void EdorasAppProcessFlightOdom(CFE_SB_Buffer_t *SBBufPtr)
 {
     CFE_MSG_FcnCode_t CommandCode = 0;
@@ -372,31 +371,25 @@ void EdorasAppProcessFlightOdom(CFE_SB_Buffer_t *SBBufPtr)
     // Read
     if (EdorasAppVerifyCmdLength(&SBBufPtr->Msg, sizeof(EdorasAppCmdRobotState_t)))
     {
-       //EdorasAppCmdRobotState_t* state = (EdorasAppCmdRobotState_t *)SBBufPtr;   
+       //EdorasAppCmdRobotState_t* state = (EdorasAppCmdRobotState_t *)SBBufPtr;
+       
+       // Fill the lastState
+       //lastOdomMsg = state->odom;                     
     }
 
-
     return;
+}
 
-} /* End of EdorasAppProcessFlightCommand() */
 
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
-/*  Name:  EdorasAppReportHousekeeping                                          */
-/*                                                                            */
-/*  Purpose:                                                                  */
-/*         This function is triggered in response to a task telemetry request */
-/*         from the housekeeping task. This function will gather the Apps     */
-/*         telemetry, packetize it and send it to the housekeeping task via   */
-/*         the software bus                                                   */
-/* * * * * * * * * * * * * * * * * * * * * * * *  * * * * * * *  * *  * * * * */
+/**
+ *  Name:  EdorasAppReportHousekeeping
+ */
 int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
 {
     { 
      // Read telemetry, if any
      double joints[7];
-     int32_t sec;
-     uint32_t nanosec;
+     int32_t sec; uint32_t nanosec;
      if(!receiveJointStateTlm(&commData, joints, &sec, &nanosec))
        return CFE_SUCCESS;
        
@@ -427,7 +420,7 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
 
      set_int32(js_msg, parse_joint_state_.ti, "header.stamp.sec", sec);
      set_uint32(js_msg, parse_joint_state_.ti, "header.stamp.nanosec", nanosec);
-
+               
      // DEBUG 
      debug_parse_buffer(js_msg, parse_joint_state_.ti);
 
@@ -516,11 +509,11 @@ void HighRateControlLoop(void) {
     // 2. Update the telemetry information        
     //EdorasAppOdometry_t *st = &lastOdomMsg; //EdorasAppGoal.StateTlm;
 
-    //EdorasAppData.HkTlm.Payload.state.pose.x = st->pose.x;
-    //EdorasAppData.HkTlm.Payload.state.pose.y = st->pose.y;
+    /*EdorasAppData.HkTlm.Payload.state.pose.x = st->pose.x;
+    EdorasAppData.HkTlm.Payload.state.pose.y = st->pose.y;
 
-    //EdorasAppData.HkTlm.Payload.state.twist.linear_x = st->twist.linear_x;
-    //EdorasAppData.HkTlm.Payload.state.twist.linear_y = st->twist.linear_y;
+    EdorasAppData.HkTlm.Payload.state.twist.linear_x = st->twist.linear_x;
+    EdorasAppData.HkTlm.Payload.state.twist.linear_y = st->twist.linear_y;*/
 
     // This data is sent when a Housekeeping request is received, 
     // (usually, at a low rate) so nothing sent here
