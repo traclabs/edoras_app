@@ -73,21 +73,17 @@ typedef struct
     uint32 square_counter;
     uint32 hk_counter;
    
-    // Housekeeping telemetry packet...
-    EdorasAppHkTlm_t HkTlm;
-    EdorasAppTlmRobotCommand_t LastTwist;
-    
     // Run Status variable used in the main processing loop
     uint32 RunStatus;
 
-    /*
-    ** Operational data (not reported in housekeeping)...
-    */
+    // Operational data (not reported in housekeeping)
     CFE_SB_PipeId_t CommandPipe;
 
-    /*
-    ** Initialization data (not reported in housekeeping)...
-    */
+    // Keep note of updates
+    bool rcvd_twist_1;
+    bool rcvd_twist_2;
+
+    // Initialization data (not reported in housekeeping)...
     char   PipeName[CFE_MISSION_MAX_API_LEN];
     uint16 PipeDepth;
 
@@ -107,13 +103,9 @@ void  EdorasAppMain(void);
 int32 EdorasAppInit(void);
 
 void  EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr);
-void  EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr);
-
-int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg);
-void EdorasAppProcessFlightOdom(CFE_SB_Buffer_t *SBBufPtr);
-
-int32 EdorasAppNoop(const EdorasAppNoopCmd_t *Msg);
-int32 EdorasAppCmdTwist(const EdorasAppTwistCmd_t *Msg);
+void  EdorasAppProcessGroundTwist(CFE_SB_Buffer_t *SBBufPtr, int _robot_id);
+void EdorasAppProcessFlightPose(CFE_SB_Buffer_t *SBBufPtr, int _robot_id);
+int32 EdorasAppReportHousekeeping(void);
 
 bool EdorasAppVerifyCmdLength(CFE_MSG_Message_t *MsgPtr, size_t ExpectedLength);
 
