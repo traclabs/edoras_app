@@ -270,11 +270,11 @@ void EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
             break;
 
         case EDORAS_APP_POSE_1_FLIGHT_MID:
-            //EdorasAppProcessFlightPose(SBBufPtr, 1);
+            EdorasAppProcessFlightPose(SBBufPtr, 1);
             break;
 
         case EDORAS_APP_POSE_2_FLIGHT_MID:
-            //EdorasAppProcessFlightPose(SBBufPtr, 2);
+            EdorasAppProcessFlightPose(SBBufPtr, 2);
             break;
 
             
