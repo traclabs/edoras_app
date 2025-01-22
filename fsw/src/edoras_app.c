@@ -361,6 +361,7 @@ void EdorasAppProcessFlightPose(CFE_SB_Buffer_t *SBBufPtr, int _robot_id)
 
     size_t actual_length = 0;
     CFE_MSG_GetSize(&SBBufPtr->Msg, &actual_length);
+    
     //printf("******** DEBUG: Actual length of Pose command: %ld. Minus header: %ld \n", actual_length, actual_length - 8);
         
           
