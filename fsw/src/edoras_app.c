@@ -177,10 +177,10 @@ int32 EdorasAppInit(void)
     // Initialize data coming out of fsw (going to ground as telemetry, or going to rosfsw as commands)
     // CFE_MSG_Init Clears memory of message size and sets up the respective bytes of the telemetry headers
     CFE_MSG_Init(&tlm_pose_1.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_POSE_1_GROUND_MID), sizeof(tlm_pose_1));
-    //CFE_MSG_Init(&tlm_pose_2.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_POSE_2_GROUND_MID), sizeof(tlm_pose_2));
+    CFE_MSG_Init(&tlm_pose_2.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_POSE_2_GROUND_MID), sizeof(tlm_pose_2));
     
     CFE_MSG_Init(&cmd_twist_1.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TWIST_1_FLIGHT_MID), sizeof(cmd_twist_1) );
-    //CFE_MSG_Init(&cmd_twist_2.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TWIST_2_FLIGHT_MID), sizeof(cmd_twist_2) );    
+    CFE_MSG_Init(&cmd_twist_2.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TWIST_2_FLIGHT_MID), sizeof(cmd_twist_2) );    
 
     // Create Software Bus message pipe.
     status = CFE_SB_CreatePipe(&EdorasAppData.CommandPipe, EdorasAppData.PipeDepth, EdorasAppData.PipeName);
@@ -352,16 +352,16 @@ void EdorasAppProcessFlightPose(CFE_SB_Buffer_t *SBBufPtr, int _robot_id)
               
     // You know the first 8 bytes are the header
     size_t offset = 0;
-    unsigned char header[8];
+    uint8_t header[8];
     memcpy(&header, SBBufPtr + offset, sizeof(header));
             
     // DEBUG
-    //printf("Got command data: Header: %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x \n", 
+    //printf("Got command data flight pose: Header: %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x \n", 
     //       header[0], header[1], header[2], header[3], header[4], header[5], header[6], header[7]);
-  
+
     size_t actual_length = 0;
     CFE_MSG_GetSize(&SBBufPtr->Msg, &actual_length);
-    printf("******** DEBUG: Actual length of Pose command: %ld. Minus header: %ld \n", actual_length, actual_length - 8);
+    //printf("******** DEBUG: Actual length of Pose command: %ld. Minus header: %ld \n", actual_length, actual_length - 8);
         
           
     // Send command to robot using ROS2 on the flight side
@@ -384,12 +384,9 @@ void EdorasAppProcessFlightPose(CFE_SB_Buffer_t *SBBufPtr, int _robot_id)
       memcpy(&tlm_pose_2.data, (uint8_t*) (SBBufPtr) + offset, data_size);
       CFE_SB_TimeStampMsg(&tlm_pose_2.TlmHeader.Msg);
       CFE_SB_TransmitMsg(&tlm_pose_2.TlmHeader.Msg, update_header);      
-    } 
-    
+    }     
     return;
 }
-
-
 
 /**
  *  Name:  EdorasAppReportHousekeeping
@@ -400,7 +397,7 @@ int32 EdorasAppReportHousekeeping(void)
   bool update_header = true;
   if(EdorasAppData.rcvd_twist_1 == true)
   {
-     OS_printf("******** DEBUG: Sending twist to flight side command 1  ** \n");
+     //OS_printf("******** DEBUG: Sending twist to flight side command 1  ** \n");
      CFE_SB_TimeStampMsg(&cmd_twist_1.TlmHeader.Msg);
      CFE_Status_t  res;
      res = CFE_SB_TransmitMsg(&cmd_twist_1.TlmHeader.Msg, update_header);
@@ -410,21 +407,12 @@ int32 EdorasAppReportHousekeeping(void)
   }
   if(EdorasAppData.rcvd_twist_2 == true)
   {
-     printf("******** DEBUG: Sending twist to flight side command 2 \n");  
+     //printf("******** DEBUG: Sending twist to flight side command 2 \n");  
      CFE_SB_TimeStampMsg(&cmd_twist_2.TlmHeader.Msg);
      CFE_SB_TransmitMsg(&cmd_twist_2.TlmHeader.Msg, update_header);
      EdorasAppData.rcvd_twist_2 = false;  
   }
- /*
-    EdorasAppData.HkTlm.Payload.CommandErrorCounter = EdorasAppData.ErrCounter*2;
-    EdorasAppData.ErrCounter++;
-    EdorasAppData.HkTlm.Payload.CommandCounter      = EdorasAppData.CmdCounter++;
 
-    OS_printf("EdorasAppReportHousekeeping reporting: %d\n", EdorasAppData.HkTlm.Payload.CommandCounter);
- 
-    CFE_SB_TimeStampMsg(&EdorasAppData.HkTlm.TlmHeader.Msg);
-    CFE_SB_TransmitMsg(&EdorasAppData.HkTlm.TlmHeader.Msg, true);
-*/
     return CFE_SUCCESS;
 
 }
@@ -442,8 +430,6 @@ bool EdorasAppVerifyCmdLength(CFE_MSG_Message_t *MsgPtr, size_t ExpectedLength)
     size_t            ActualLength = 0;
     CFE_SB_MsgId_t    MsgId        = CFE_SB_INVALID_MSG_ID;
     CFE_MSG_FcnCode_t FcnCode      = 0;
-
-    printf("EdorasAppVerifyCmdLength() --\n");
 
     CFE_MSG_GetSize(MsgPtr, &ActualLength);
 
