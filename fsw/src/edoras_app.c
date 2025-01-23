@@ -176,11 +176,11 @@ int32 EdorasAppInit(void)
     
     // Initialize data coming out of fsw (going to ground as telemetry, or going to rosfsw as commands)
     // CFE_MSG_Init Clears memory of message size and sets up the respective bytes of the telemetry headers
-    CFE_MSG_Init(&tlm_pose_1.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_POSE_1_GROUND_MID), sizeof(tlm_pose_1));
-    CFE_MSG_Init(&tlm_pose_2.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_POSE_2_GROUND_MID), sizeof(tlm_pose_2));
+    CFE_MSG_Init(&tlm_pose_1.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TLM_1_GROUND_MID), sizeof(tlm_pose_1));
+    CFE_MSG_Init(&tlm_pose_2.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TLM_2_GROUND_MID), sizeof(tlm_pose_2));
     
-    CFE_MSG_Init(&cmd_twist_1.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TWIST_1_FLIGHT_MID), sizeof(cmd_twist_1) );
-    CFE_MSG_Init(&cmd_twist_2.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TWIST_2_FLIGHT_MID), sizeof(cmd_twist_2) );    
+    CFE_MSG_Init(&cmd_twist_1.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_CMD_1_FLIGHT_MID), sizeof(cmd_twist_1) );
+    CFE_MSG_Init(&cmd_twist_2.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_CMD_2_FLIGHT_MID), sizeof(cmd_twist_2) );    
 
     // Create Software Bus message pipe.
     status = CFE_SB_CreatePipe(&EdorasAppData.CommandPipe, EdorasAppData.PipeDepth, EdorasAppData.PipeName);
@@ -210,25 +210,25 @@ int32 EdorasAppInit(void)
     // Subscribe to command packets coming to fsw
     // Either they come from the ground (commands)
     // Or they are telemetry coming from the flightside (rosfsw)
-    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_TWIST_1_GROUND_MID), EdorasAppData.CommandPipe);
+    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_CMD_1_GROUND_MID), EdorasAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
         CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Ground Twist 1, RC = 0x%08lX\n", (unsigned long)status);
         return (status);
     }
-    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_TWIST_2_GROUND_MID), EdorasAppData.CommandPipe);
+    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_CMD_2_GROUND_MID), EdorasAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
         CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Ground Twist 2, RC = 0x%08lX\n", (unsigned long)status);
         return (status);
     }
-    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_POSE_1_FLIGHT_MID), EdorasAppData.CommandPipe);
+    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_TLM_1_FLIGHT_MID), EdorasAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
         CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Flight Pose 1, RC = 0x%08lX\n", (unsigned long)status);
         return (status);
     }
-    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_POSE_2_FLIGHT_MID), EdorasAppData.CommandPipe);
+    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_TLM_2_FLIGHT_MID), EdorasAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
         CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Flight Pose 2, RC = 0x%08lX\n", (unsigned long)status);
@@ -261,19 +261,19 @@ void EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
             //HighRateControlLoop();
             break;
 
-        case EDORAS_APP_TWIST_1_GROUND_MID:
+        case EDORAS_APP_CMD_1_GROUND_MID:
             EdorasAppProcessGroundTwist(SBBufPtr, 1);
             break;
 
-        case EDORAS_APP_TWIST_2_GROUND_MID:
+        case EDORAS_APP_CMD_2_GROUND_MID:
             EdorasAppProcessGroundTwist(SBBufPtr, 2);
             break;
 
-        case EDORAS_APP_POSE_1_FLIGHT_MID:
+        case EDORAS_APP_TLM_1_FLIGHT_MID:
             EdorasAppProcessFlightPose(SBBufPtr, 1);
             break;
 
-        case EDORAS_APP_POSE_2_FLIGHT_MID:
+        case EDORAS_APP_TLM_2_FLIGHT_MID:
             EdorasAppProcessFlightPose(SBBufPtr, 2);
             break;
 
