@@ -3,7 +3,8 @@
 ** File: edoras_app.c
 **
 ** Purpose:
-**   This file contains the source code for the ros App.
+**   This file has a demo that receives control input for both the small and the big arm
+**   and returns as telemetry the robots' joint state for both of them back to ground
 **
 *******************************************************************************/
 
@@ -22,7 +23,7 @@
 EdorasAppData_t EdorasAppData;
 
 ParseData_t parse_pose_; // Receive command
-ParseData_t parse_twist_; // Send telemetry
+ParseData_t parse_joint_state_; // Send telemetry
 
 typedef struct
 {
@@ -33,13 +34,13 @@ typedef struct
 typedef struct
 {
     CFE_MSG_TelemetryHeader_t  TlmHeader;
-    uint8_t data[80]; // 56 for c ros struct, 68 serialized = 52 + 8 length + 8 capacity
-} TwistData_t;
+    uint8_t data[300]; // 56 for c ros struct, 68 serialized = 52 + 8 length + 8 capacity
+} JointStateData_t;
 
-PoseData_t tlm_pose_1;
-PoseData_t tlm_pose_2;
-TwistData_t cmd_twist_1;
-TwistData_t cmd_twist_2;
+PoseData_t cmd_pose_1;
+PoseData_t cmd_pose_2;
+JointStateData_t tlm_js_1;
+JointStateData_t tlm_js_2;
 
 // To delete
 EdorasAppData_t EdorasAppData;
@@ -81,7 +82,6 @@ void EdorasAppMain(void)
     CFE_ES_PerfLogEntry(EDORAS_APP_PERF_ID);
 
     // Perform application specific initialization
-    // 0: CFE_ES_RunStatus_UNDEFINED, 1: CFE_ES_RunStatus_APP_RUN, 2: CFE_ES_RunStatus_APP_EXIT, 3: CFE_ES_RunStatus_APP_ERROR
     status = EdorasAppInit();
     if (status != CFE_SUCCESS)
     {   printf("Setting run status to be error !!!!!!!!\n");
@@ -127,8 +127,8 @@ void EdorasAppMain(void)
 int32 EdorasAppInit(void)
 {
     // Init ROS message stuff
-    initializeParseData("geometry_msgs", "PoseStamped", &parse_pose_);
-    initializeParseData("geometry_msgs", "Twist", &parse_twist_);
+    initializeParseData("geometry_msgs", "Pose", &parse_pose_);
+    initializeParseData("sensor_msgs", "JointState", &parse_joint_state_);
 
     int32 status;
 
@@ -140,8 +140,8 @@ int32 EdorasAppInit(void)
     EdorasAppData.square_counter = 0;
     EdorasAppData.hk_counter = 0;
 
-    EdorasAppData.rcvd_twist_1 = false;
-    EdorasAppData.rcvd_twist_2 = false;
+    EdorasAppData.rcvd_cmd_1 = false;
+    EdorasAppData.rcvd_cmd_2 = false;
     
     // Initialize app configuration data
     EdorasAppData.PipeDepth = EDORAS_APP_PIPE_DEPTH;
@@ -176,11 +176,11 @@ int32 EdorasAppInit(void)
     
     // Initialize data coming out of fsw (going to ground as telemetry, or going to rosfsw as commands)
     // CFE_MSG_Init Clears memory of message size and sets up the respective bytes of the telemetry headers
-    CFE_MSG_Init(&tlm_pose_1.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_POSE_1_GROUND_MID), sizeof(tlm_pose_1));
-    CFE_MSG_Init(&tlm_pose_2.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_POSE_2_GROUND_MID), sizeof(tlm_pose_2));
+    CFE_MSG_Init(&tlm_js_1.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TLM_1_GROUND_MID), sizeof(tlm_js_1));
+    CFE_MSG_Init(&tlm_js_2.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TLM_2_GROUND_MID), sizeof(tlm_js_2));
     
-    CFE_MSG_Init(&cmd_twist_1.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TWIST_1_FLIGHT_MID), sizeof(cmd_twist_1) );
-    CFE_MSG_Init(&cmd_twist_2.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TWIST_2_FLIGHT_MID), sizeof(cmd_twist_2) );    
+    CFE_MSG_Init(&cmd_pose_1.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_CMD_1_FLIGHT_MID), sizeof(cmd_pose_1) );
+    CFE_MSG_Init(&cmd_pose_2.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_CMD_2_FLIGHT_MID), sizeof(cmd_pose_2) );    
 
     // Create Software Bus message pipe.
     status = CFE_SB_CreatePipe(&EdorasAppData.CommandPipe, EdorasAppData.PipeDepth, EdorasAppData.PipeName);
@@ -210,28 +210,28 @@ int32 EdorasAppInit(void)
     // Subscribe to command packets coming to fsw
     // Either they come from the ground (commands)
     // Or they are telemetry coming from the flightside (rosfsw)
-    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_TWIST_1_GROUND_MID), EdorasAppData.CommandPipe);
+    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_CMD_1_GROUND_MID), EdorasAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
-        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Ground Twist 1, RC = 0x%08lX\n", (unsigned long)status);
+        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Ground Cmd Pose 1, RC = 0x%08lX\n", (unsigned long)status);
         return (status);
     }
-    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_TWIST_2_GROUND_MID), EdorasAppData.CommandPipe);
+    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_CMD_2_GROUND_MID), EdorasAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
-        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Ground Twist 2, RC = 0x%08lX\n", (unsigned long)status);
+        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Ground Cmd Pose 2, RC = 0x%08lX\n", (unsigned long)status);
         return (status);
     }
-    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_POSE_1_FLIGHT_MID), EdorasAppData.CommandPipe);
+    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_TLM_1_FLIGHT_MID), EdorasAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
-        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Flight Pose 1, RC = 0x%08lX\n", (unsigned long)status);
+        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Flight Tlm JointState 1, RC = 0x%08lX\n", (unsigned long)status);
         return (status);
     }
-    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_POSE_2_FLIGHT_MID), EdorasAppData.CommandPipe);
+    status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_TLM_2_FLIGHT_MID), EdorasAppData.CommandPipe);
     if (status != CFE_SUCCESS)
     {
-        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Flight Pose 2, RC = 0x%08lX\n", (unsigned long)status);
+        CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Flight Tlm JointState 2, RC = 0x%08lX\n", (unsigned long)status);
         return (status);
     }
 
@@ -261,20 +261,20 @@ void EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
             //HighRateControlLoop();
             break;
 
-        case EDORAS_APP_TWIST_1_GROUND_MID:
-            EdorasAppProcessGroundTwist(SBBufPtr, 1);
+        case EDORAS_APP_CMD_1_GROUND_MID:
+            EdorasAppProcessGroundCmd(SBBufPtr, 1);
             break;
 
-        case EDORAS_APP_TWIST_2_GROUND_MID:
-            EdorasAppProcessGroundTwist(SBBufPtr, 2);
+        case EDORAS_APP_CMD_2_GROUND_MID:
+            EdorasAppProcessGroundCmd(SBBufPtr, 2);
             break;
 
-        case EDORAS_APP_POSE_1_FLIGHT_MID:
-            EdorasAppProcessFlightPose(SBBufPtr, 1);
+        case EDORAS_APP_TLM_1_FLIGHT_MID:
+            EdorasAppProcessFlightTlm(SBBufPtr, 1);
             break;
 
-        case EDORAS_APP_POSE_2_FLIGHT_MID:
-            EdorasAppProcessFlightPose(SBBufPtr, 2);
+        case EDORAS_APP_TLM_2_FLIGHT_MID:
+            EdorasAppProcessFlightTlm(SBBufPtr, 2);
             break;
 
             
@@ -293,7 +293,7 @@ void EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
  * @function EdorasAppProcessGroundCommand
  * @brief Edoras App ground commands               
  */
-void EdorasAppProcessGroundTwist(CFE_SB_Buffer_t *SBBufPtr, int _robot_id)
+void EdorasAppProcessGroundCmd(CFE_SB_Buffer_t *SBBufPtr, int _robot_id)
 {
     CFE_MSG_FcnCode_t CommandCode = 0;
     CFE_MSG_GetFcnCode(&SBBufPtr->Msg, &CommandCode);
@@ -323,14 +323,14 @@ void EdorasAppProcessGroundTwist(CFE_SB_Buffer_t *SBBufPtr, int _robot_id)
     offset += sizeof(header);
     size_t data_size = actual_length - offset;
     if(_robot_id == 1)
-    { //printf("Received twist command from ground for robot 1, sending it to flight side \n");
-      EdorasAppData.rcvd_twist_1 = true;
-      memcpy(&cmd_twist_1.data, (uint8_t*) (SBBufPtr) + offset, data_size*sizeof(uint8_t));
+    { 
+      EdorasAppData.rcvd_cmd_1 = true;
+      memcpy(&cmd_pose_1.data, (uint8_t*) (SBBufPtr) + offset, data_size*sizeof(uint8_t));
     }
     else if(_robot_id == 2)
     {
-      EdorasAppData.rcvd_twist_2 = true;
-      memcpy(&cmd_twist_2.data, (uint8_t*) (SBBufPtr) + offset, data_size*sizeof(uint8_t));
+      EdorasAppData.rcvd_cmd_2 = true;
+      memcpy(&cmd_pose_2.data, (uint8_t*) (SBBufPtr) + offset, data_size*sizeof(uint8_t));
     } 
     
     return;
@@ -338,10 +338,10 @@ void EdorasAppProcessGroundTwist(CFE_SB_Buffer_t *SBBufPtr, int _robot_id)
 
 
 /**                                   
- * @function EdorasAppProcessFlightPose
- * @brief Edoras App ground commands               
+ * @function EdorasAppProcessFlightTlm
+ * @brief Receives data from flightside, returns to ground             
  */
-void EdorasAppProcessFlightPose(CFE_SB_Buffer_t *SBBufPtr, int _robot_id)
+void EdorasAppProcessFlightTlm(CFE_SB_Buffer_t *SBBufPtr, int _robot_id)
 {
     CFE_MSG_FcnCode_t CommandCode = 0;
     CFE_MSG_GetFcnCode(&SBBufPtr->Msg, &CommandCode);
@@ -365,7 +365,7 @@ void EdorasAppProcessFlightPose(CFE_SB_Buffer_t *SBBufPtr, int _robot_id)
     //printf("******** DEBUG: Actual length of Pose command: %ld. Minus header: %ld \n", actual_length, actual_length - 8);
         
           
-    // Send command to robot using ROS2 on the flight side
+    // Send telemetry data from flight to ground
     // Put the information directly in the twist that we'll send to the robot on the flight side
     // (message will be the same, only difference is the header)
     // offset: 8 (command header size)
@@ -376,15 +376,15 @@ void EdorasAppProcessFlightPose(CFE_SB_Buffer_t *SBBufPtr, int _robot_id)
     size_t data_size = actual_length - offset;
     if(_robot_id == 1)
     {
-      memcpy(&tlm_pose_1.data, (uint8_t*) (SBBufPtr) + offset, data_size);
-      CFE_SB_TimeStampMsg(&tlm_pose_1.TlmHeader.Msg);
-      CFE_SB_TransmitMsg(&tlm_pose_1.TlmHeader.Msg, update_header); 
+      memcpy(&tlm_js_1.data, (uint8_t*) (SBBufPtr) + offset, data_size);
+      CFE_SB_TimeStampMsg(&tlm_js_1.TlmHeader.Msg);
+      CFE_SB_TransmitMsg(&tlm_js_1.TlmHeader.Msg, update_header); 
     }
     else if(_robot_id == 2)
     {
-      memcpy(&tlm_pose_2.data, (uint8_t*) (SBBufPtr) + offset, data_size);
-      CFE_SB_TimeStampMsg(&tlm_pose_2.TlmHeader.Msg);
-      CFE_SB_TransmitMsg(&tlm_pose_2.TlmHeader.Msg, update_header);      
+      memcpy(&tlm_js_2.data, (uint8_t*) (SBBufPtr) + offset, data_size);
+      CFE_SB_TimeStampMsg(&tlm_js_2.TlmHeader.Msg);
+      CFE_SB_TransmitMsg(&tlm_js_2.TlmHeader.Msg, update_header);      
     }     
     return;
 }
@@ -396,22 +396,21 @@ int32 EdorasAppReportHousekeeping(void)
 {
 
   bool update_header = true;
-  if(EdorasAppData.rcvd_twist_1 == true)
+  if(EdorasAppData.rcvd_cmd_1 == true)
   {
-     //OS_printf("******** DEBUG: Sending twist to flight side command 1  ** \n");
-     CFE_SB_TimeStampMsg(&cmd_twist_1.TlmHeader.Msg);
+     CFE_SB_TimeStampMsg(&cmd_pose_1.TlmHeader.Msg);
      CFE_Status_t  res;
-     res = CFE_SB_TransmitMsg(&cmd_twist_1.TlmHeader.Msg, update_header);
+     res = CFE_SB_TransmitMsg(&cmd_pose_1.TlmHeader.Msg, update_header);
      if(res != CFE_SUCCESS)
        OS_printf("Error in trying to transmit twist to flight side: %d \n", res); 
-     EdorasAppData.rcvd_twist_1 = false;
+     EdorasAppData.rcvd_cmd_1 = false;
   }
-  if(EdorasAppData.rcvd_twist_2 == true)
+  if(EdorasAppData.rcvd_cmd_2 == true)
   {
      //printf("******** DEBUG: Sending twist to flight side command 2 \n");  
-     CFE_SB_TimeStampMsg(&cmd_twist_2.TlmHeader.Msg);
-     CFE_SB_TransmitMsg(&cmd_twist_2.TlmHeader.Msg, update_header);
-     EdorasAppData.rcvd_twist_2 = false;  
+     CFE_SB_TimeStampMsg(&cmd_pose_2.TlmHeader.Msg);
+     CFE_SB_TransmitMsg(&cmd_pose_2.TlmHeader.Msg, update_header);
+     EdorasAppData.rcvd_cmd_2 = false;  
   }
 
     return CFE_SUCCESS;

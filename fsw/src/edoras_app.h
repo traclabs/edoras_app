@@ -80,8 +80,8 @@ typedef struct
     CFE_SB_PipeId_t CommandPipe;
 
     // Keep note of updates
-    bool rcvd_twist_1;
-    bool rcvd_twist_2;
+    bool rcvd_cmd_1;
+    bool rcvd_cmd_2;
 
     // Initialization data (not reported in housekeeping)...
     char   PipeName[CFE_MISSION_MAX_API_LEN];
@@ -103,8 +103,8 @@ void  EdorasAppMain(void);
 int32 EdorasAppInit(void);
 
 void  EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr);
-void  EdorasAppProcessGroundTwist(CFE_SB_Buffer_t *SBBufPtr, int _robot_id);
-void EdorasAppProcessFlightPose(CFE_SB_Buffer_t *SBBufPtr, int _robot_id);
+void  EdorasAppProcessGroundCmd(CFE_SB_Buffer_t *SBBufPtr, int _robot_id);
+void EdorasAppProcessFlightTlm(CFE_SB_Buffer_t *SBBufPtr, int _robot_id);
 int32 EdorasAppReportHousekeeping(void);
 
 bool EdorasAppVerifyCmdLength(CFE_MSG_Message_t *MsgPtr, size_t ExpectedLength);

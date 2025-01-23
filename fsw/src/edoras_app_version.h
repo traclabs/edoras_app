@@ -58,7 +58,7 @@
  * official version. @n See @ref cfsversions for format differences between development and release versions.
  */
 #define EDORAS_APP_VERSION_STRING                       \
-    " GATEWAY APP DEVELOPMENT BUILD " EDORAS_APP_VERSION \
+    " EDORAS APP DEVELOPMENT BUILD " EDORAS_APP_VERSION \
     ", Last Official Release: v1.1.0" /* For full support please use this version */
 
 #endif /* EDORAS_APP_VERSION_H */
