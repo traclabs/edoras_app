@@ -7,9 +7,6 @@
 **
 *******************************************************************************/
 
-/*
-** Include Files:
-*/
 #include "edoras_app_events.h"
 #include "edoras_app_version.h"
 #include "edoras_app.h"
@@ -32,11 +29,11 @@
 #define CFS_IP "127.0.0.1"  // fsw
 #endif
 
+// Code that creates a socket and sends information from cFS to the robot
 #include "robot_comm_udp_gateway_big_arm.h"
 
 // Global data
 EdorasAppData_t EdorasAppData;
-
 CommData_t commData;
 
 ParseData_t parse_pose_; // Receive command
@@ -50,36 +47,33 @@ typedef struct
 
 JointStateData_t tlm_joint_state;
 
-// To delete
-EdorasAppData_t EdorasAppData;
-
 void HighRateControlLoop(void);
+void initializeParseData(const char* _interface_name, const char* _interface_type, ParseData_t *_parse_data );
 
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  * *  * * * * **/
-/* EdorasAppMain() -- Application entry point and main process loop         */
-/*                                                                            */
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  * *  * * * * **/
+/**
+ * @brief Application entry point and main process loop
+ */
 void EdorasAppMain(void)
 {
     int32            status;
     CFE_SB_Buffer_t *SBBufPtr;
 
-    // Create the first Performance Log entry
     CFE_ES_PerfLogEntry(EDORAS_APP_PERF_ID);
-
-    // Perform application specific initialization
-    // 0: CFE_ES_RunStatus_UNDEFINED, 1: CFE_ES_RunStatus_APP_RUN, 2: CFE_ES_RunStatus_APP_EXIT, 3: CFE_ES_RunStatus_APP_ERROR
+    
+    // Initialize
     status = EdorasAppInit();
     if (status != CFE_SUCCESS)
-    {   printf("Setting run status to be error !!!!!!!!\n");
+    {   perror("Setting run status to be error !");
         EdorasAppData.RunStatus = CFE_ES_RunStatus_APP_ERROR;
     }
 
-    // Start comm
-    CFE_ES_WriteToSysLog("Edoras App: Starting communication cfs port: %d ip: %s robot port: %d ip: %s ******* \n", CFS_PORT, CFS_IP, ROBOT_PORT, ROBOT_IP);
+    // Start communication with the executable that controls robot in ROS, using a socket
+    CFE_ES_WriteToSysLog("Edoras App: Start comm, cfs port: %d ip: %s robot port: %d ip: %s ******* \n", 
+                          CFS_PORT, CFS_IP, ROBOT_PORT, ROBOT_IP);
     if(!setupComm(&commData, CFS_PORT, ROBOT_PORT, CFS_IP, ROBOT_IP))
     {
        perror("Error setting up communication to the robot using sockets");
+       EdorasAppData.RunStatus = CFE_ES_RunStatus_APP_ERROR;
     }
 
     // Run loop
@@ -110,35 +104,9 @@ void EdorasAppMain(void)
     CFE_ES_PerfLogExit(EDORAS_APP_PERF_ID);
 
     CFE_ES_ExitApp(EdorasAppData.RunStatus);
-
 }
 
 /**
- * @function initializeParseData
- */
-void initializeParseData(const char* _interface_name, const char* _interface_type, ParseData_t *_parse_data )
-{
-    _parse_data->interface_type = _interface_name;
-    _parse_data->interface_name = _interface_type;
-    _parse_data->ti = get_type_info(_parse_data->interface_type, _parse_data->interface_name);
-
-    _parse_data->ts_library = get_type_support_library(_parse_data->interface_type, _parse_data->interface_name);
-    _parse_data->ts = get_type_support(_parse_data->interface_type, _parse_data->interface_name, _parse_data->ts_library);
-}
-
-/**
- * @function getSizeWithTlmHeader
- */
-size_t getSizeWithTlmHeader(ParseData_t *_parse_data)
-{
-   size_t size_msg = _parse_data->ti->size_of_;
-   size_t size_tlm_hdr = sizeof(CFE_MSG_TelemetryHeader_t);
-   printf("Size msg: %ld size tlm hdr: %ld \n", size_msg, size_tlm_hdr);
-   return size_msg + size_tlm_hdr;
-}
-
-/**
- * @function EdorasAppInit
  * @brief Initialize app
  */
 int32 EdorasAppInit(void)
@@ -148,7 +116,6 @@ int32 EdorasAppInit(void)
     initializeParseData("sensor_msgs", "JointState", &parse_joint_state_);
 
     int32 status;
-
     EdorasAppData.RunStatus = CFE_ES_RunStatus_APP_RUN;
 
     // Initialize app command execution counters
@@ -165,9 +132,7 @@ int32 EdorasAppInit(void)
     strncpy(EdorasAppData.PipeName, "EDORAS_APP_PIPE", sizeof(EdorasAppData.PipeName));
     EdorasAppData.PipeName[sizeof(EdorasAppData.PipeName) - 1] = 0;
 
-    /*
-    ** Initialize event filter table...
-    */
+    // Initialize event filter table...
     EdorasAppData.EventFilters[0].EventID = EDORAS_APP_STARTUP_INF_EID;
     EdorasAppData.EventFilters[0].Mask    = 0x0000;
     EdorasAppData.EventFilters[1].EventID = EDORAS_APP_COMMAND_ERR_EID;
@@ -219,15 +184,6 @@ int32 EdorasAppInit(void)
 
         return (status);
     }
-
-    // Subscribe to flight odom data
-    //status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_CMD_ODOM_MID), EdorasAppData.CommandPipe);
-    //if (status != CFE_SUCCESS)
-    //{
-    //    CFE_ES_WriteToSysLog("Edoras App: Error Subscribing to Odom data, RC = 0x%08lX\n", (unsigned long)status);
-    //    return (status);
-    //}
-
     
     // Subscribe to HR wakeup
     status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_HR_CONTROL_MID), EdorasAppData.CommandPipe);
@@ -245,6 +201,30 @@ int32 EdorasAppInit(void)
 } 
 
 /**
+ * @brief Function to initialize ParseData structure to contain ROS2 message serialized data
+ */
+void initializeParseData(const char* _interface_name, const char* _interface_type, ParseData_t *_parse_data )
+{
+    _parse_data->interface_type = _interface_name;
+    _parse_data->interface_name = _interface_type;
+    _parse_data->ti = get_type_info(_parse_data->interface_type, _parse_data->interface_name);
+
+    _parse_data->ts_library = get_type_support_library(_parse_data->interface_type, _parse_data->interface_name);
+    _parse_data->ts = get_type_support(_parse_data->interface_type, _parse_data->interface_name, _parse_data->ts_library);
+}
+
+/**
+ * @brief Returns size of message + size of telemetry header
+ */
+size_t getSizeWithTlmHeader(ParseData_t *_parse_data)
+{
+   size_t size_msg = _parse_data->ti->size_of_;
+   size_t size_tlm_hdr = sizeof(CFE_MSG_TelemetryHeader_t);
+
+   return size_msg + size_tlm_hdr;
+}
+
+/**
  * @function:  EdorasAppProcessCommandPacket
  */
 void EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
@@ -252,7 +232,6 @@ void EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
     CFE_SB_MsgId_t MsgId = CFE_SB_INVALID_MSG_ID;
 
     CFE_MSG_GetMsgId(&SBBufPtr->Msg, &MsgId);
-    //printf("DEBUG: -- we're processing the cmd from MID: 0x%04x\n", CFE_SB_MsgIdToValue(MsgId));
     switch (CFE_SB_MsgIdToValue(MsgId))
     {
         case EDORAS_APP_CMD_MID:
@@ -261,10 +240,6 @@ void EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
 
         case EDORAS_APP_SEND_HK_MID:
             EdorasAppReportHousekeeping((CFE_MSG_CommandHeader_t *)SBBufPtr);
-            break;
-
-        case EDORAS_APP_CMD_ODOM_MID:
-            EdorasAppProcessFlightOdom(SBBufPtr);
             break;
 
         case EDORAS_APP_HR_CONTROL_MID:
@@ -295,7 +270,6 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
     switch (CommandCode)
     {
         case EDORAS_APP_NOOP_CC:
-            printf("Noop...\n");
             if (EdorasAppVerifyCmdLength(&SBBufPtr->Msg, sizeof(EdorasAppNoopCmd_t)))
             {
                 EdorasAppNoop((EdorasAppNoopCmd_t *)SBBufPtr);
@@ -305,44 +279,34 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 
         case EDORAS_APP_SET_TWIST_CC:
         {
-            //if (EdorasAppVerifyCmdLength(&SBBufPtr->Msg, sizeof(EdorasAppTwistCmd_t)))
-            //{
-              // Let's see if we can deserialize
-              
             // You know the first 8 bytes are the header
             size_t offset = 0;
             unsigned char header[8];
             memcpy(&header, SBBufPtr + offset, sizeof(header));
             
             // DEBUG
-            //printf("Got command data: Header: %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x \n", 
-            //       header[0], header[1], header[2], header[3], header[4], header[5], header[6], header[7]);
-  
             size_t actual_length = 0;
             CFE_MSG_GetSize(&SBBufPtr->Msg, &actual_length);
-            //printf("******** DEBUG: Actual length of command: %ld. Minus header: %ld \n", actual_length, actual_length - 8);
         
-        // Parse the information  
-        offset = 8;
-        uint8_t* msg_pointer = NULL;
-        size_t buffer_size;
-        msg_pointer = from_uint_buffer_to_msg_pointer( (uint8_t*)SBBufPtr, offset, parse_pose_.ts, parse_pose_.ti, &buffer_size);
+            // Parse the information  
+            offset = 8;
+            uint8_t* msg_pointer = NULL;
+            size_t buffer_size;
+            msg_pointer = from_uint_buffer_to_msg_pointer( (uint8_t*)SBBufPtr, offset, parse_pose_.ts, parse_pose_.ti, &buffer_size);
         
-        // Get data
-        double pos_x, pos_y, pos_z, orient_x, orient_y, orient_z, orient_w;
-        get_float64(msg_pointer, parse_pose_.ti, "position.x", &pos_x);
-        get_float64(msg_pointer, parse_pose_.ti, "position.y", &pos_y);
-        get_float64(msg_pointer, parse_pose_.ti, "position.z", &pos_z);
-        get_float64(msg_pointer, parse_pose_.ti, "orientation.x", &orient_x);
-        get_float64(msg_pointer, parse_pose_.ti, "orientation.y", &orient_y);
-        get_float64(msg_pointer, parse_pose_.ti, "orientation.z", &orient_z);
-        get_float64(msg_pointer, parse_pose_.ti, "orientation.w", &orient_w);                                
-        //debug_parse_buffer(msg_pointer, parse_twist_.ti);
-        //printf("Reading linear velocity: %f and angular : %f \n", vel_lin, vel_ang);
+            // Get data
+            double pos_x, pos_y, pos_z, orient_x, orient_y, orient_z, orient_w;
+            get_float64(msg_pointer, parse_pose_.ti, "position.x", &pos_x);
+            get_float64(msg_pointer, parse_pose_.ti, "position.y", &pos_y);
+            get_float64(msg_pointer, parse_pose_.ti, "position.z", &pos_z);
+            get_float64(msg_pointer, parse_pose_.ti, "orientation.x", &orient_x);
+            get_float64(msg_pointer, parse_pose_.ti, "orientation.y", &orient_y);
+            get_float64(msg_pointer, parse_pose_.ti, "orientation.z", &orient_z);
+            get_float64(msg_pointer, parse_pose_.ti, "orientation.w", &orient_w);                                
         
-        // Send data to robot!!!
-        sendPoseCmd(&commData, pos_x, pos_y, pos_z, orient_x, orient_y, orient_z, orient_w);
-       }
+            // Send data to robot using the socket
+            sendPoseCmd(&commData, pos_x, pos_y, pos_z, orient_x, orient_y, orient_z, orient_w);
+        }
              break;
 
         /* default case already found during FC vs length test */
@@ -355,31 +319,7 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 
     return;
 
-} /* End of EdorasAppProcessFlightOdom() */
-
-/**
- * @EdorasAppProcessFlightOdom() -- Edoras App flight odometry  
- **/
-void EdorasAppProcessFlightOdom(CFE_SB_Buffer_t *SBBufPtr)
-{
-    CFE_MSG_FcnCode_t CommandCode = 0;
-
-    CFE_MSG_GetFcnCode(&SBBufPtr->Msg, &CommandCode);
-
-    printf("EdorasAppProcessGroundCommand() -- we're getting a flight odometry message ...%d\n", CommandCode);
-
-    // Read
-    if (EdorasAppVerifyCmdLength(&SBBufPtr->Msg, sizeof(EdorasAppCmdRobotState_t)))
-    {
-       //EdorasAppCmdRobotState_t* state = (EdorasAppCmdRobotState_t *)SBBufPtr;
-       
-       // Fill the lastState
-       //lastOdomMsg = state->odom;                     
-    }
-
-    return;
 }
-
 
 /**
  *  Name:  EdorasAppReportHousekeeping
@@ -432,20 +372,13 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
      printf("Size of parse_joint_state element: %ld. Size of tlm header: %ld, size of Tlm data size: %ld \n", 
             sizeof(tlm_joint_state), sizeof(CFE_MSG_TelemetryHeader_t), tlm_data_size);
  
-     // See header
-     //printf("*** Tlm Header sent to ground: ");
-     //for(size_t i = 0; i < 8; i++)
-     //   printf("%02x ", tlm_joint_state.TlmHeader.Msg.Byte[i]);     
-     //printf("\n");
-
      // Fill
      for(size_t i = 0; i < tlm_data_size; i++)
         memcpy(&tlm_joint_state.data[i], (uint8_t*)(tlm_data) + i, sizeof(uint8_t)); 
     
-     // Debug
-     //printBuffer(tlm_data, tlm_data_size, "Data to send back to ground: ");
-     
-     CFE_SB_TimeStampMsg(&tlm_joint_state.TlmHeader.Msg);
+      CFE_SB_TimeStampMsg(&tlm_joint_state.TlmHeader.Msg);
+ 
+     // Send TELEMETRY back to ground (TransmitMsg)
      // update_header: If true, the sequence counter bit in the primary header will increase each time
      // If false, it will remain zero.
      bool update_header = true;
@@ -469,24 +402,22 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
     CFE_SB_TransmitMsg(&EdorasAppData.HkTlm.TlmHeader.Msg, true);
 
     return CFE_SUCCESS;
+}
 
-} /* End of EdorasAppReportHousekeeping() */
-
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
-/*                                                                            */
-/* EdorasAppNoop -- ROS NOOP commands                                          */
-/*                                                                            */
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
+/**
+ * @brief noop command - does nothing
+ */
 int32 EdorasAppNoop(const EdorasAppNoopCmd_t *Msg)
 {
     CFE_EVS_SendEvent(EDORAS_APP_COMMANDNOP_INF_EID, CFE_EVS_EventType_INFORMATION, "Edoras App: NOOP command %s",
                       EDORAS_APP_VERSION);
 
     return CFE_SUCCESS;
-} /* End of EdorasAppNoop */
+}
 
-
+/**
+ * @brief Updates last twist field in message that will be sent to robot
+ */
 int32 EdorasAppCmdTwist(const EdorasAppTwistCmd_t *Msg)
 {
     EdorasAppData.LastTwist.twist.linear_x = Msg->twist.linear_x;
@@ -496,7 +427,6 @@ int32 EdorasAppCmdTwist(const EdorasAppTwistCmd_t *Msg)
     EdorasAppData.LastTwist.twist.angular_y = Msg->twist.angular_y;
     EdorasAppData.LastTwist.twist.angular_z = Msg->twist.angular_z;
 
-
     CFE_EVS_SendEvent(EDORAS_APP_COMMANDTWIST_INF_EID, CFE_EVS_EventType_INFORMATION, "Edoras App: twist command %s",
                       EDORAS_APP_VERSION);
 
@@ -504,6 +434,9 @@ int32 EdorasAppCmdTwist(const EdorasAppTwistCmd_t *Msg)
     
 }
 
+/**
+ * @brief Not used in this example
+ */
 void HighRateControlLoop(void) {
         
     // 2. Update the telemetry information        
@@ -521,11 +454,10 @@ void HighRateControlLoop(void) {
     
 }
 
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
-/*                                                                            */
-/* EdorasAppVerifyCmdLength() -- Verify command packet length                   */
-/*                                                                            */
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **/
+/*                                                                            
+ * @function EdorasAppVerifyCmdLength
+ * @brief Verify command packet length
+ */ 
 bool EdorasAppVerifyCmdLength(CFE_MSG_Message_t *MsgPtr, size_t ExpectedLength)
 {
     bool              result       = true;
@@ -533,13 +465,9 @@ bool EdorasAppVerifyCmdLength(CFE_MSG_Message_t *MsgPtr, size_t ExpectedLength)
     CFE_SB_MsgId_t    MsgId        = CFE_SB_INVALID_MSG_ID;
     CFE_MSG_FcnCode_t FcnCode      = 0;
 
-    printf("EdorasAppVerifyCmdLength() --\n");
-
     CFE_MSG_GetSize(MsgPtr, &ActualLength);
 
-    /*
-    ** Verify the command packet length.
-    */
+    // Verify the command packet length.
     if (ExpectedLength != ActualLength)
     {
         CFE_MSG_GetMsgId(MsgPtr, &MsgId);
@@ -557,4 +485,4 @@ bool EdorasAppVerifyCmdLength(CFE_MSG_Message_t *MsgPtr, size_t ExpectedLength)
 
     return (result);
 
-} /* End of EdorasAppVerifyCmdLength() */
+}
