@@ -30,22 +30,27 @@
 #endif
 
 // Code that creates a socket and sends information from cFS to the robot
-#include "robot_comm_udp_gateway_big_arm.h"
+#include "robot_comm_udp_imetro.h"
 
 // Global data
 EdorasAppData_t EdorasAppData;
 CommData_t commData;
 
-ParseData_t parse_pose_; // Receive command
-ParseData_t parse_joint_state_; // Send telemetry
-
 typedef struct
 {
     CFE_MSG_TelemetryHeader_t  TlmHeader;
-    uint8_t data[260]; // 56 for c ros struct, 76 serialized
-} JointStateData_t;
+    uint8_t js[9];
+} TlmData_t;
 
-JointStateData_t tlm_joint_state;
+
+typedef struct
+{
+    CFE_MSG_CommandHeader_t  CmdHeader;
+    uint16_t command_id;
+    float32_t js[9];
+} CmdData_t;
+
+TlmData_t tlm_joint_state;
 
 void HighRateControlLoop(void);
 void initializeParseData(const char* _interface_name, const char* _interface_type, ParseData_t *_parse_data );
@@ -111,10 +116,6 @@ void EdorasAppMain(void)
  */
 int32 EdorasAppInit(void)
 {
-    // Init ROS message stuff
-    initializeParseData("geometry_msgs", "Pose", &parse_pose_);
-    initializeParseData("sensor_msgs", "JointState", &parse_joint_state_);
-
     int32 status;
     EdorasAppData.RunStatus = CFE_ES_RunStatus_APP_RUN;
 
@@ -201,19 +202,6 @@ int32 EdorasAppInit(void)
 } 
 
 /**
- * @brief Function to initialize ParseData structure to contain ROS2 message serialized data
- */
-void initializeParseData(const char* _interface_name, const char* _interface_type, ParseData_t *_parse_data )
-{
-    _parse_data->interface_type = _interface_name;
-    _parse_data->interface_name = _interface_type;
-    _parse_data->ti = get_type_info(_parse_data->interface_type, _parse_data->interface_name);
-
-    _parse_data->ts_library = get_type_support_library(_parse_data->interface_type, _parse_data->interface_name);
-    _parse_data->ts = get_type_support(_parse_data->interface_type, _parse_data->interface_name, _parse_data->ts_library);
-}
-
-/**
  * @brief Returns size of message + size of telemetry header
  */
 size_t getSizeWithTlmHeader(ParseData_t *_parse_data)
@@ -277,7 +265,7 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 
             break;
 
-        case EDORAS_APP_SET_TWIST_CC:
+        case EDORAS_APP_CMD_CC:
         {
             // You know the first 8 bytes are the header
             size_t offset = 0;
@@ -293,16 +281,6 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
             uint8_t* msg_pointer = NULL;
             size_t buffer_size;
             msg_pointer = from_uint_buffer_to_msg_pointer( (uint8_t*)SBBufPtr, offset, parse_pose_.ts, parse_pose_.ti, &buffer_size);
-        
-            // Get data
-            double pos_x, pos_y, pos_z, orient_x, orient_y, orient_z, orient_w;
-            get_float64(msg_pointer, parse_pose_.ti, "position.x", &pos_x);
-            get_float64(msg_pointer, parse_pose_.ti, "position.y", &pos_y);
-            get_float64(msg_pointer, parse_pose_.ti, "position.z", &pos_z);
-            get_float64(msg_pointer, parse_pose_.ti, "orientation.x", &orient_x);
-            get_float64(msg_pointer, parse_pose_.ti, "orientation.y", &orient_y);
-            get_float64(msg_pointer, parse_pose_.ti, "orientation.z", &orient_z);
-            get_float64(msg_pointer, parse_pose_.ti, "orientation.w", &orient_w);                                
         
             // Send data to robot using the socket
             sendPoseCmd(&commData, pos_x, pos_y, pos_z, orient_x, orient_y, orient_z, orient_w);
@@ -336,27 +314,6 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
      // If data received from robot update telemetry data
      // to send back to ground
      uint8_t* js_msg = create_msg(parse_joint_state_.ti);
-
-     // Fill data
-     resize_sequence(js_msg, parse_joint_state_.ti, "position", 7);
-          
-     set_float64(js_msg, parse_joint_state_.ti, "position.0", joints[0]);
-     set_float64(js_msg, parse_joint_state_.ti, "position.1", joints[1]);
-     set_float64(js_msg, parse_joint_state_.ti, "position.2", joints[2]);
-     set_float64(js_msg, parse_joint_state_.ti, "position.3", joints[3]);
-     set_float64(js_msg, parse_joint_state_.ti, "position.4", joints[4]);
-     set_float64(js_msg, parse_joint_state_.ti, "position.5", joints[5]);
-     set_float64(js_msg, parse_joint_state_.ti, "position.6", joints[6]);
-
-     resize_sequence(js_msg, parse_joint_state_.ti, "name", 7);
-
-     set_const_char(js_msg, parse_joint_state_.ti, "name.0", "big_arm_joint_2");
-     set_const_char(js_msg, parse_joint_state_.ti, "name.1", "big_arm_joint_3");
-     set_const_char(js_msg, parse_joint_state_.ti, "name.2", "big_arm_joint_4");
-     set_const_char(js_msg, parse_joint_state_.ti, "name.3", "big_arm_joint_5");
-     set_const_char(js_msg, parse_joint_state_.ti, "name.4", "big_arm_joint_6");
-     set_const_char(js_msg, parse_joint_state_.ti, "name.5", "big_arm_joint_7");
-     set_const_char(js_msg, parse_joint_state_.ti, "name.6", "big_arm_joint_8");
 
      set_int32(js_msg, parse_joint_state_.ti, "header.stamp.sec", sec);
      set_uint32(js_msg, parse_joint_state_.ti, "header.stamp.nanosec", nanosec);

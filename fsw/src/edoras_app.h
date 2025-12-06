@@ -42,25 +42,11 @@
 #include "edoras_app_msgids.h"
 #include "edoras_app_msg.h"
 
-#include <edoras_core/interface.h>
-
 /***********************************************************************/
 #define EDORAS_APP_PIPE_DEPTH 32 /* Depth of the Command Pipe for Application */
 /************************************************************************
 ** Type Definitions
 *************************************************************************/
-
-/*
-** Global Data
-*/
-typedef struct 
-{
-const TypeInfo_t * ti; 
-void* ts_library;
-const TypeSupport_t* ts;
-const char* interface_type;
-const char* interface_name;
-} ParseData_t;
 
 typedef struct
 {
