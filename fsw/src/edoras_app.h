@@ -50,18 +50,6 @@
 ** Type Definitions
 *************************************************************************/
 
-/*
-** Global Data
-*/
-typedef struct 
-{
-const TypeInfo_t * ti; 
-void* ts_library;
-const TypeSupport_t* ts;
-const char* interface_type;
-const char* interface_name;
-} ParseData_t;
-
 typedef struct
 {
     /*
@@ -75,7 +63,6 @@ typedef struct
    
     // Housekeeping telemetry packet...
     EdorasAppHkTlm_t HkTlm;
-    EdorasAppTlmRobotCommand_t LastTwist;
     
     // Run Status variable used in the main processing loop
     uint32 RunStatus;
@@ -113,7 +100,6 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg);
 void EdorasAppProcessFlightOdom(CFE_SB_Buffer_t *SBBufPtr);
 
 int32 EdorasAppNoop(const EdorasAppNoopCmd_t *Msg);
-int32 EdorasAppCmdTwist(const EdorasAppTwistCmd_t *Msg);
 
 bool EdorasAppVerifyCmdLength(CFE_MSG_Message_t *MsgPtr, size_t ExpectedLength);
 

@@ -40,18 +40,18 @@ bool setupComm( CommData_t* _cd, int _cfs_port, int _robot_port, const char* _cf
   return true;
 }
 
-bool sendPoseCmd( CommData_t* _cd, double _pos_x, double _pos_y, double _pos_z, double _orient_x, double _orient_y, double _orient_z, double _orient_w)
+bool sendPoseCmd( CommData_t* _cd, float _pos[3], float _rot[4])
 {
     uint8_t* buf     = NULL;
-    double   pose_data[7] = {_pos_x, _pos_y, _pos_z, _orient_x, _orient_y, _orient_z, _orient_w};
-    size_t   bufSize = 7*sizeof(double);
+    float   pose_data[7] = {_pos[0], _pos[1], _pos[2], _rot[0], _rot[1], _rot[2], _rot[3]};
+    size_t   bufSize = 7*sizeof(float);
     
     buf = (uint8_t*)malloc(bufSize);
     size_t offset = 0;
     for(int i = 0; i < 7; ++i)
     {
-      memcpy(buf + offset, &pose_data[i], sizeof(double));
-      offset += sizeof(double);
+      memcpy(buf + offset, &pose_data[i], sizeof(float));
+      offset += sizeof(float);
     }
  
    // DEBUG
@@ -76,7 +76,7 @@ bool sendPoseCmd( CommData_t* _cd, double _pos_x, double _pos_y, double _pos_z, 
 /**
  * @function receivePoseTlm
  */
-bool receiveJointStateTlm(CommData_t* _cd, double _js[7], int32_t* _sec, uint32_t* _nanosec)
+bool receiveJointStateTlm(CommData_t* _cd, float _js[7], int32_t* _sec, uint32_t* _nanosec)
 {
      ssize_t buffer_rcvd_size; 
      const int MAXLINE = 1024;
@@ -91,8 +91,8 @@ bool receiveJointStateTlm(CommData_t* _cd, double _js[7], int32_t* _sec, uint32_
       // Fill fields
       for(int i = 0; i < 7; ++i)  
       {
-       memcpy(&_js[i], bp + offset, sizeof(double));
-       offset += sizeof(double);
+       memcpy(&_js[i], bp + offset, sizeof(float));
+       offset += sizeof(float);
       }
 
       // Sec

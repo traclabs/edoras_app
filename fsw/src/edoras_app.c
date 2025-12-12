@@ -36,19 +36,24 @@
 EdorasAppData_t EdorasAppData;
 CommData_t commData;
 
-ParseData_t parse_pose_; // Receive command
-ParseData_t parse_joint_state_; // Send telemetry
-
 typedef struct
 {
     CFE_MSG_TelemetryHeader_t  TlmHeader;
-    uint8_t data[260]; // 56 for c ros struct, 76 serialized
+    float joints[7];
 } JointStateData_t;
 
+typedef struct
+{
+    CFE_MSG_CommandHeader_t  TlmHeader;
+    float pos[3];
+    float rot[4];
+} EndEffectorCommandData_t;
+
 JointStateData_t tlm_joint_state;
+EndEffectorCommandData_t cmd_ee_pose;
 
 void HighRateControlLoop(void);
-void initializeParseData(const char* _interface_name, const char* _interface_type, ParseData_t *_parse_data );
+
 
 /**
  * @brief Application entry point and main process loop
@@ -111,10 +116,6 @@ void EdorasAppMain(void)
  */
 int32 EdorasAppInit(void)
 {
-    // Init ROS message stuff
-    initializeParseData("geometry_msgs", "Pose", &parse_pose_);
-    initializeParseData("sensor_msgs", "JointState", &parse_joint_state_);
-
     int32 status;
     EdorasAppData.RunStatus = CFE_ES_RunStatus_APP_RUN;
 
@@ -123,8 +124,6 @@ int32 EdorasAppInit(void)
     EdorasAppData.ErrCounter = 0;
     EdorasAppData.square_counter = 0;
     EdorasAppData.hk_counter = 0;
-
-    EdorasAppData.HkTlm.Payload.state.pose.x = 0.0;
 
     // Initialize app configuration data
     EdorasAppData.PipeDepth = EDORAS_APP_PIPE_DEPTH;
@@ -139,7 +138,7 @@ int32 EdorasAppInit(void)
     EdorasAppData.EventFilters[1].Mask    = 0x0000;
     EdorasAppData.EventFilters[2].EventID = EDORAS_APP_COMMANDNOP_INF_EID;
     EdorasAppData.EventFilters[2].Mask    = 0x0000;
-    EdorasAppData.EventFilters[3].EventID = EDORAS_APP_COMMANDTWIST_INF_EID;
+    EdorasAppData.EventFilters[3].EventID = EDORAS_APP_COMMANDCMD_INF_EID;
     EdorasAppData.EventFilters[3].Mask    = 0x0000;
     EdorasAppData.EventFilters[4].EventID = EDORAS_APP_INVALID_MSGID_ERR_EID;
     EdorasAppData.EventFilters[4].Mask    = 0x0000;
@@ -200,29 +199,6 @@ int32 EdorasAppInit(void)
     return (CFE_SUCCESS);
 } 
 
-/**
- * @brief Function to initialize ParseData structure to contain ROS2 message serialized data
- */
-void initializeParseData(const char* _interface_name, const char* _interface_type, ParseData_t *_parse_data )
-{
-    _parse_data->interface_type = _interface_name;
-    _parse_data->interface_name = _interface_type;
-    _parse_data->ti = get_type_info(_parse_data->interface_type, _parse_data->interface_name);
-
-    _parse_data->ts_library = get_type_support_library(_parse_data->interface_type, _parse_data->interface_name);
-    _parse_data->ts = get_type_support(_parse_data->interface_type, _parse_data->interface_name, _parse_data->ts_library);
-}
-
-/**
- * @brief Returns size of message + size of telemetry header
- */
-size_t getSizeWithTlmHeader(ParseData_t *_parse_data)
-{
-   size_t size_msg = _parse_data->ti->size_of_;
-   size_t size_tlm_hdr = sizeof(CFE_MSG_TelemetryHeader_t);
-
-   return size_msg + size_tlm_hdr;
-}
 
 /**
  * @function:  EdorasAppProcessCommandPacket
@@ -277,35 +253,15 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 
             break;
 
-        case EDORAS_APP_SET_TWIST_CC:
+        case EDORAS_APP_CMD_CC:
         {
-            // You know the first 8 bytes are the header
-            size_t offset = 0;
-            unsigned char header[8];
-            memcpy(&header, SBBufPtr + offset, sizeof(header));
-            
-            // DEBUG
-            size_t actual_length = 0;
-            CFE_MSG_GetSize(&SBBufPtr->Msg, &actual_length);
-        
-            // Parse the information  
-            offset = 8;
-            uint8_t* msg_pointer = NULL;
-            size_t buffer_size;
-            msg_pointer = from_uint_buffer_to_msg_pointer( (uint8_t*)SBBufPtr, offset, parse_pose_.ts, parse_pose_.ti, &buffer_size);
-        
-            // Get data
-            double pos_x, pos_y, pos_z, orient_x, orient_y, orient_z, orient_w;
-            get_float64(msg_pointer, parse_pose_.ti, "position.x", &pos_x);
-            get_float64(msg_pointer, parse_pose_.ti, "position.y", &pos_y);
-            get_float64(msg_pointer, parse_pose_.ti, "position.z", &pos_z);
-            get_float64(msg_pointer, parse_pose_.ti, "orientation.x", &orient_x);
-            get_float64(msg_pointer, parse_pose_.ti, "orientation.y", &orient_y);
-            get_float64(msg_pointer, parse_pose_.ti, "orientation.z", &orient_z);
-            get_float64(msg_pointer, parse_pose_.ti, "orientation.w", &orient_w);                                
+            memcpy(&cmd_ee_pose, SBBufPtr, sizeof(cmd_ee_pose));
+            OS_printf("Cmd ee pose: %f %f %f -- %f %f %f %f \n", 
+              cmd_ee_pose.pos[0], cmd_ee_pose.pos[1], cmd_ee_pose.pos[2],
+              cmd_ee_pose.rot[0], cmd_ee_pose.rot[1], cmd_ee_pose.rot[2], cmd_ee_pose.rot[3]);         
         
             // Send data to robot using the socket
-            sendPoseCmd(&commData, pos_x, pos_y, pos_z, orient_x, orient_y, orient_z, orient_w);
+            sendPoseCmd(&commData, cmd_ee_pose.pos, cmd_ee_pose.rot);
         }
              break;
 
@@ -328,65 +284,24 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
 {
     { 
      // Read telemetry, if any
-     double joints[7];
      int32_t sec; uint32_t nanosec;
-     if(!receiveJointStateTlm(&commData, joints, &sec, &nanosec))
+     if(!receiveJointStateTlm(&commData, tlm_joint_state.joints, &sec, &nanosec))
        return CFE_SUCCESS;
+
+     OS_printf("Size of tlm header: %ld, size of Tlm data size: %ld. data: %f %f %f %f %f %f %f \n", 
+            sizeof(CFE_MSG_TelemetryHeader_t), sizeof(tlm_joint_state), tlm_joint_state.joints[0], tlm_joint_state.joints[1], tlm_joint_state.joints[2], 
+            tlm_joint_state.joints[3], tlm_joint_state.joints[4], 
+            tlm_joint_state.joints[5], tlm_joint_state.joints[6]);
        
      // If data received from robot update telemetry data
-     // to send back to ground
-     uint8_t* js_msg = create_msg(parse_joint_state_.ti);
-
-     // Fill data
-     resize_sequence(js_msg, parse_joint_state_.ti, "position", 7);
-          
-     set_float64(js_msg, parse_joint_state_.ti, "position.0", joints[0]);
-     set_float64(js_msg, parse_joint_state_.ti, "position.1", joints[1]);
-     set_float64(js_msg, parse_joint_state_.ti, "position.2", joints[2]);
-     set_float64(js_msg, parse_joint_state_.ti, "position.3", joints[3]);
-     set_float64(js_msg, parse_joint_state_.ti, "position.4", joints[4]);
-     set_float64(js_msg, parse_joint_state_.ti, "position.5", joints[5]);
-     set_float64(js_msg, parse_joint_state_.ti, "position.6", joints[6]);
-
-     resize_sequence(js_msg, parse_joint_state_.ti, "name", 7);
-
-     set_const_char(js_msg, parse_joint_state_.ti, "name.0", "big_arm_joint_2");
-     set_const_char(js_msg, parse_joint_state_.ti, "name.1", "big_arm_joint_3");
-     set_const_char(js_msg, parse_joint_state_.ti, "name.2", "big_arm_joint_4");
-     set_const_char(js_msg, parse_joint_state_.ti, "name.3", "big_arm_joint_5");
-     set_const_char(js_msg, parse_joint_state_.ti, "name.4", "big_arm_joint_6");
-     set_const_char(js_msg, parse_joint_state_.ti, "name.5", "big_arm_joint_7");
-     set_const_char(js_msg, parse_joint_state_.ti, "name.6", "big_arm_joint_8");
-
-     set_int32(js_msg, parse_joint_state_.ti, "header.stamp.sec", sec);
-     set_uint32(js_msg, parse_joint_state_.ti, "header.stamp.nanosec", nanosec);
-               
-     // DEBUG 
-     debug_parse_buffer(js_msg, parse_joint_state_.ti);
-
-     // Convert data to serialized version
-     uint8_t* tlm_data = NULL;
-     size_t tlm_data_size;
-     tlm_data = from_msg_pointer_to_uint_buffer(js_msg, parse_joint_state_.ts, parse_joint_state_.ti, &tlm_data_size);
-     
-     printf("Size of parse_joint_state element: %ld. Size of tlm header: %ld, size of Tlm data size: %ld \n", 
-            sizeof(tlm_joint_state), sizeof(CFE_MSG_TelemetryHeader_t), tlm_data_size);
- 
-     // Fill
-     for(size_t i = 0; i < tlm_data_size; i++)
-        memcpy(&tlm_joint_state.data[i], (uint8_t*)(tlm_data) + i, sizeof(uint8_t)); 
-    
+     // to send back to ground    
       CFE_SB_TimeStampMsg(&tlm_joint_state.TlmHeader.Msg);
  
      // Send TELEMETRY back to ground (TransmitMsg)
      // update_header: If true, the sequence counter bit in the primary header will increase each time
      // If false, it will remain zero.
      bool update_header = true;
-     CFE_SB_TransmitMsg(&tlm_joint_state.TlmHeader.Msg, update_header); 
-     
-     // Clean up
-     free(js_msg);
-     free(tlm_data);
+     CFE_SB_TransmitMsg(&tlm_joint_state.TlmHeader.Msg, update_header);      
     }
  
     /*
@@ -415,24 +330,6 @@ int32 EdorasAppNoop(const EdorasAppNoopCmd_t *Msg)
     return CFE_SUCCESS;
 }
 
-/**
- * @brief Updates last twist field in message that will be sent to robot
- */
-int32 EdorasAppCmdTwist(const EdorasAppTwistCmd_t *Msg)
-{
-    EdorasAppData.LastTwist.twist.linear_x = Msg->twist.linear_x;
-    EdorasAppData.LastTwist.twist.linear_y = Msg->twist.linear_y; 
-    EdorasAppData.LastTwist.twist.linear_z = Msg->twist.linear_z;
-    EdorasAppData.LastTwist.twist.angular_x = Msg->twist.angular_x;
-    EdorasAppData.LastTwist.twist.angular_y = Msg->twist.angular_y;
-    EdorasAppData.LastTwist.twist.angular_z = Msg->twist.angular_z;
-
-    CFE_EVS_SendEvent(EDORAS_APP_COMMANDTWIST_INF_EID, CFE_EVS_EventType_INFORMATION, "Edoras App: twist command %s",
-                      EDORAS_APP_VERSION);
-
-    return CFE_SUCCESS;
-    
-}
 
 /**
  * @brief Not used in this example
