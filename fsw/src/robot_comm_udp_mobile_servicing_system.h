@@ -1,5 +1,5 @@
-#ifndef __ROBOT_COMM_UDP_GATEWAY_BIG_ARM_H__
-#define __ROBOT_COMM_UDP_GATEWAY_BIG_ARM_H__
+#ifndef __ROBOT_COMM_UDP_MOBILE_SERVICING_SYSTEM_H__
+#define __ROBOT_COMM_UDP_MOBILE_SERVICING_SYSTEM_H__
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -19,6 +19,13 @@ typedef struct
 
 bool setupComm( CommData_t* _cd, int _cfs_port, int _robot_port, const char* _cfs_ip, const char* _robot_ip);
 bool sendPoseCmd( CommData_t* _cd, float _pos[3], float _rot[4]);
-bool receiveJointStateTlm(CommData_t* _cd, float _js[7], int32_t* _sec, uint32_t* _nanosec);
+bool sendGroupCmd( CommData_t* _cd, char _group[30], char _state[30]);
+bool receiveJointStateTlm(CommData_t* _cd, 
+  float _js_canadarm[7], 
+  float _js_dextre_arm_1[6], float _js_dextre_arm_2[6], float* _js_dextre_body,
+  float* _js_mbs,
+  float _port_bga[4], float* _port_sarj,
+  float _starboard_bga[4], float* _starboard_sarj,
+  int32_t* _sec, uint32_t* _nanosec);
 
 #endif // __ROBOT_COMM_UDP_ROVER_H__

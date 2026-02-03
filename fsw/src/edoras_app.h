@@ -90,6 +90,7 @@ typedef struct
 void  EdorasAppMain(void);
 
 int32 EdorasAppInit(void);
+bool getString(char _input_string[], int _input_size, int _start_index, char _output_string[], int *_end_index);
 
 void  EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr);
 void  EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr);

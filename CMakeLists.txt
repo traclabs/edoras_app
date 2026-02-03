@@ -5,13 +5,13 @@ include_directories(fsw/platform_inc)
 #include_directories(${edoras_app_MISSION_DIR}/fsw/platform_inc) # ros_app?
  
 # Create library for talking to robot using sockets
-add_library(robot_comm_udp_gateway_big_arm fsw/src/robot_comm_udp_gateway_big_arm.c)
+add_library(robot_comm_udp_mobile_servicing_system fsw/src/robot_comm_udp_mobile_servicing_system.c)
 
 # Create the app module
 add_cfe_app(edoras_app fsw/src/edoras_app.c)
 target_link_libraries(edoras_app 
                       m 
-                      robot_comm_udp_gateway_big_arm)
+                      robot_comm_udp_mobile_servicing_system)
 
 target_include_directories(edoras_app PUBLIC
   fsw/mission_inc

@@ -30,7 +30,7 @@
 #endif
 
 // Code that creates a socket and sends information from cFS to the robot
-#include "robot_comm_udp_gateway_big_arm.h"
+#include "robot_comm_udp_mobile_servicing_system.h"
 
 // Global data
 EdorasAppData_t EdorasAppData;
@@ -39,18 +39,27 @@ CommData_t commData;
 typedef struct
 {
     CFE_MSG_TelemetryHeader_t  TlmHeader;
-    float joints[7];
+    float joints_canadarm[7];
+    float joints_dextre_arm_1[6];
+    float joints_dextre_arm_2[6];
+    float joint_dextre_body;
+    float joint_mbs;
+    float port_bga[4];
+    float port_sarj;
+    float starboard_bga[4];
+    float starboard_sarj;
+    
 } JointStateData_t;
 
 typedef struct
 {
     CFE_MSG_CommandHeader_t  TlmHeader;
-    float pos[3];
-    float rot[4];
-} EndEffectorCommandData_t;
+    char group_state[30+30];
+    //char state[30];
+} GroupCommandData_t;
 
 JointStateData_t tlm_joint_state;
-EndEffectorCommandData_t cmd_ee_pose;
+GroupCommandData_t cmd_group;
 
 void HighRateControlLoop(void);
 
@@ -255,13 +264,19 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 
         case EDORAS_APP_CMD_CC:
         {
-            memcpy(&cmd_ee_pose, SBBufPtr, sizeof(cmd_ee_pose));
-            OS_printf("Cmd ee pose: %f %f %f -- %f %f %f %f \n", 
-              cmd_ee_pose.pos[0], cmd_ee_pose.pos[1], cmd_ee_pose.pos[2],
-              cmd_ee_pose.rot[0], cmd_ee_pose.rot[1], cmd_ee_pose.rot[2], cmd_ee_pose.rot[3]);         
+            memcpy(&cmd_group, SBBufPtr, sizeof(cmd_group));
+
+            char group[30]; char state[30];
+            int end_group; int end_state;
+
+            getString(cmd_group.group_state, 60,  0, group, &end_group);
+            getString(cmd_group.group_state, 60, end_group + 1, state, &end_state);
+              
+            OS_printf("Cmd group pose: %s  , state: %s \n", group, state);
+
         
             // Send data to robot using the socket
-            sendPoseCmd(&commData, cmd_ee_pose.pos, cmd_ee_pose.rot);
+            sendGroupCmd(&commData, group, state);
         }
              break;
 
@@ -272,9 +287,36 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
             break;
     }
 
-
     return;
 
+}
+
+
+bool getString(char _input_string[], int _input_size, int _start_index, char _output_string[], int *_end_index)
+{
+   // End of group
+   *_end_index = -1; 
+   for(int i = _start_index; i < _input_size; ++i)
+   {
+      if(_input_string[i] == '\0')
+      {
+         *_end_index = i;
+         break;
+       }
+   }
+   
+   if(*_end_index == -1)
+     return false;
+            
+   // Fill string
+   int index = 0;
+   for(int i = _start_index; i <= *_end_index; ++i)
+   {
+      _output_string[index] = _input_string[i];
+      index++;
+   }                          
+
+   return true;
 }
 
 /**
@@ -285,13 +327,26 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
     { 
      // Read telemetry, if any
      int32_t sec; uint32_t nanosec;
-     if(!receiveJointStateTlm(&commData, tlm_joint_state.joints, &sec, &nanosec))
+     
+     if(!receiveJointStateTlm(&commData, 
+       tlm_joint_state.joints_canadarm, 
+       tlm_joint_state.joints_dextre_arm_1, 
+       tlm_joint_state.joints_dextre_arm_2, 
+       &tlm_joint_state.joint_dextre_body, 
+       &tlm_joint_state.joint_mbs, 
+       tlm_joint_state.port_bga, &tlm_joint_state.port_sarj, 
+       tlm_joint_state.starboard_bga, &tlm_joint_state.starboard_sarj, 
+       &sec, &nanosec))
        return CFE_SUCCESS;
 
-     OS_printf("Size of tlm header: %ld, size of Tlm data size: %ld. data: %f %f %f %f %f %f %f \n", 
-            sizeof(CFE_MSG_TelemetryHeader_t), sizeof(tlm_joint_state), tlm_joint_state.joints[0], tlm_joint_state.joints[1], tlm_joint_state.joints[2], 
-            tlm_joint_state.joints[3], tlm_joint_state.joints[4], 
-            tlm_joint_state.joints[5], tlm_joint_state.joints[6]);
+     OS_printf("Size of tlm header: %ld, size of Tlm data size: %ld. data canadarm: %f %f %f %f %f %f %f \n", 
+            sizeof(CFE_MSG_TelemetryHeader_t), sizeof(tlm_joint_state), 
+            tlm_joint_state.joints_canadarm[0], tlm_joint_state.joints_canadarm[1], tlm_joint_state.joints_canadarm[2], 
+            tlm_joint_state.joints_canadarm[3], tlm_joint_state.joints_canadarm[4], 
+            tlm_joint_state.joints_canadarm[5], tlm_joint_state.joints_canadarm[6]);
+
+     OS_printf("-- data joint mbs: %f \n", 
+            tlm_joint_state.joint_mbs); 
        
      // If data received from robot update telemetry data
      // to send back to ground    
