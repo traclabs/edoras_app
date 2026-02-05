@@ -16,7 +16,7 @@
 
 #include <math.h>
 
-#define MULTIHOST 
+#define MULTIHOST
 
 #define ROBOT_PORT 8585
 #define CFS_PORT 8080
@@ -36,30 +36,43 @@
 EdorasAppData_t EdorasAppData;
 CommData_t commData;
 
+/* MSS split joint-state telemetry packets (APIDs 39-42) */
 typedef struct
 {
-    CFE_MSG_TelemetryHeader_t  TlmHeader;
-    float joints_canadarm[7];
-    float joints_dextre_arm_1[6];
-    float joints_dextre_arm_2[6];
-    float joint_dextre_body;
-    float joint_mbs;
-    float port_bga[4];
-    float port_sarj;
-    float starboard_bga[4];
-    float starboard_sarj;
-    
-} JointStateData_t;
+    CFE_MSG_TelemetryHeader_t TlmHeader;
+    float canadarm_joint_state[7];
+} EdorasAppCanadarmJointStateTlm_t;
+
+typedef struct
+{
+    CFE_MSG_TelemetryHeader_t TlmHeader;
+    float dextre_joint_state[13];
+} EdorasAppDextreJointStateTlm_t;
+
+typedef struct
+{
+    CFE_MSG_TelemetryHeader_t TlmHeader;
+    float mbs_joint_state;
+} EdorasAppMbsJointStateTlm_t;
+
+typedef struct
+{
+    CFE_MSG_TelemetryHeader_t TlmHeader;
+    float solar_joint_state[10];
+} EdorasAppSolarJointStateTlm_t;
 
 typedef struct
 {
     CFE_MSG_CommandHeader_t  TlmHeader;
     char group_state[30+30];
     //char state[30];
-} GroupCommandData_t;
+ } GroupCommandData_t;
 
-JointStateData_t tlm_joint_state;
-GroupCommandData_t cmd_group;
+ static EdorasAppCanadarmJointStateTlm_t tlm_js_canadarm;
+ static EdorasAppDextreJointStateTlm_t   tlm_js_dextre;
+ static EdorasAppMbsJointStateTlm_t      tlm_js_mbs;
+ static EdorasAppSolarJointStateTlm_t    tlm_js_solar;
+ GroupCommandData_t cmd_group;
 
 void HighRateControlLoop(void);
 
@@ -73,7 +86,7 @@ void EdorasAppMain(void)
     CFE_SB_Buffer_t *SBBufPtr;
 
     CFE_ES_PerfLogEntry(EDORAS_APP_PERF_ID);
-    
+
     // Initialize
     status = EdorasAppInit();
     if (status != CFE_SUCCESS)
@@ -82,7 +95,7 @@ void EdorasAppMain(void)
     }
 
     // Start communication with the executable that controls robot in ROS, using a socket
-    CFE_ES_WriteToSysLog("Edoras App: Start comm, cfs port: %d ip: %s robot port: %d ip: %s ******* \n", 
+    CFE_ES_WriteToSysLog("Edoras App: Start comm, cfs port: %d ip: %s robot port: %d ip: %s ******* \n",
                           CFS_PORT, CFS_IP, ROBOT_PORT, ROBOT_IP);
     if(!setupComm(&commData, CFS_PORT, ROBOT_PORT, CFS_IP, ROBOT_IP))
     {
@@ -92,7 +105,7 @@ void EdorasAppMain(void)
 
     // Run loop
     while (CFE_ES_RunLoop(&EdorasAppData.RunStatus) == true)
-    {   
+    {
         // Performance Log Exit Stamp
         CFE_ES_PerfLogExit(EDORAS_APP_PERF_ID);
 
@@ -162,11 +175,15 @@ int32 EdorasAppInit(void)
         CFE_ES_WriteToSysLog("EdorasApp: Error Registering Events, RC = 0x%08lX\n", (unsigned long)status);
         return (status);
     }
-    
+
     // Initialize housekeeping packet (clear user data area).
     CFE_MSG_Init(&EdorasAppData.HkTlm.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_HK_TLM_MID), sizeof(EdorasAppData.HkTlm));
 
-    CFE_MSG_Init(&tlm_joint_state.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_TLM_MID), sizeof(tlm_joint_state) );
+    /* Initialize split MSS joint-state telemetry packets */
+    CFE_MSG_Init(&tlm_js_canadarm.TlmHeader.Msg, CFE_SB_ValueToMsgId(EDORAS_APP_CANADARM_TLM_MID), sizeof(tlm_js_canadarm));
+    CFE_MSG_Init(&tlm_js_dextre.TlmHeader.Msg,   CFE_SB_ValueToMsgId(EDORAS_APP_DEXTRE_TLM_MID),   sizeof(tlm_js_dextre));
+    CFE_MSG_Init(&tlm_js_mbs.TlmHeader.Msg,      CFE_SB_ValueToMsgId(EDORAS_APP_MBS_TLM_MID),      sizeof(tlm_js_mbs));
+    CFE_MSG_Init(&tlm_js_solar.TlmHeader.Msg,    CFE_SB_ValueToMsgId(EDORAS_APP_SOLAR_TLM_MID),    sizeof(tlm_js_solar));
 
     // Create Software Bus message pipe.
     status = CFE_SB_CreatePipe(&EdorasAppData.CommandPipe, EdorasAppData.PipeDepth, EdorasAppData.PipeName);
@@ -192,7 +209,7 @@ int32 EdorasAppInit(void)
 
         return (status);
     }
-    
+
     // Subscribe to HR wakeup
     status = CFE_SB_Subscribe(CFE_SB_ValueToMsgId(EDORAS_APP_HR_CONTROL_MID), EdorasAppData.CommandPipe);
     if (status != CFE_SUCCESS)
@@ -206,7 +223,7 @@ int32 EdorasAppInit(void)
                       EDORAS_APP_VERSION_STRING);
 
     return (CFE_SUCCESS);
-} 
+}
 
 
 /**
@@ -230,7 +247,7 @@ void EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
         case EDORAS_APP_HR_CONTROL_MID:
             HighRateControlLoop();
             break;
-            
+
         default:
             CFE_EVS_SendEvent(EDORAS_APP_INVALID_MSGID_ERR_EID, CFE_EVS_EventType_ERROR,
                               "Edoras App: invalid command packet,MID = 0x%x", (unsigned int)CFE_SB_MsgIdToValue(MsgId));
@@ -242,9 +259,9 @@ void EdorasAppProcessCommandPacket(CFE_SB_Buffer_t *SBBufPtr)
 }
 
 
-/**                                   
+/**
  * @function EdorasAppProcessGroundCommand
- * @brief Edoras App ground commands               
+ * @brief Edoras App ground commands
  */
 void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 {
@@ -271,10 +288,10 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 
             getString(cmd_group.group_state, 60,  0, group, &end_group);
             getString(cmd_group.group_state, 60, end_group + 1, state, &end_state);
-              
+
             OS_printf("Cmd group pose: %s  , state: %s \n", group, state);
 
-        
+
             // Send data to robot using the socket
             sendGroupCmd(&commData, group, state);
         }
@@ -295,7 +312,7 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 bool getString(char _input_string[], int _input_size, int _start_index, char _output_string[], int *_end_index)
 {
    // End of group
-   *_end_index = -1; 
+   *_end_index = -1;
    for(int i = _start_index; i < _input_size; ++i)
    {
       if(_input_string[i] == '\0')
@@ -304,17 +321,17 @@ bool getString(char _input_string[], int _input_size, int _start_index, char _ou
          break;
        }
    }
-   
+
    if(*_end_index == -1)
      return false;
-            
+
    // Fill string
    int index = 0;
    for(int i = _start_index; i <= *_end_index; ++i)
    {
       _output_string[index] = _input_string[i];
       index++;
-   }                          
+   }
 
    return true;
 }
@@ -324,41 +341,46 @@ bool getString(char _input_string[], int _input_size, int _start_index, char _ou
  */
 int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
 {
-    { 
+    {
      // Read telemetry, if any
-     int32_t sec; uint32_t nanosec;
-     
-     if(!receiveJointStateTlm(&commData, 
-       tlm_joint_state.joints_canadarm, 
-       tlm_joint_state.joints_dextre_arm_1, 
-       tlm_joint_state.joints_dextre_arm_2, 
-       &tlm_joint_state.joint_dextre_body, 
-       &tlm_joint_state.joint_mbs, 
-       tlm_joint_state.port_bga, &tlm_joint_state.port_sarj, 
-       tlm_joint_state.starboard_bga, &tlm_joint_state.starboard_sarj, 
-       &sec, &nanosec))
-       return CFE_SUCCESS;
+      int32_t sec; uint32_t nanosec;
 
-     OS_printf("Size of tlm header: %ld, size of Tlm data size: %ld. data canadarm: %f %f %f %f %f %f %f \n", 
-            sizeof(CFE_MSG_TelemetryHeader_t), sizeof(tlm_joint_state), 
-            tlm_joint_state.joints_canadarm[0], tlm_joint_state.joints_canadarm[1], tlm_joint_state.joints_canadarm[2], 
-            tlm_joint_state.joints_canadarm[3], tlm_joint_state.joints_canadarm[4], 
-            tlm_joint_state.joints_canadarm[5], tlm_joint_state.joints_canadarm[6]);
+      /*
+       * Receive joint-state data directly into the split telemetry packet payloads.
+       * This removes the need for an intermediate JointStateData_t staging struct.
+       */
+      if(!receiveJointStateTlm(&commData,
+         tlm_js_canadarm.canadarm_joint_state,
+         &tlm_js_dextre.dextre_joint_state[0],
+         &tlm_js_dextre.dextre_joint_state[6],
+         &tlm_js_dextre.dextre_joint_state[12],
+         &tlm_js_mbs.mbs_joint_state,
+         &tlm_js_solar.solar_joint_state[0],
+         &tlm_js_solar.solar_joint_state[4],
+         &tlm_js_solar.solar_joint_state[5],
+         &tlm_js_solar.solar_joint_state[9],
+         &sec, &nanosec))
+         return CFE_SUCCESS;
 
-     OS_printf("-- data joint mbs: %f \n", 
-            tlm_joint_state.joint_mbs); 
-       
-     // If data received from robot update telemetry data
-     // to send back to ground    
-      CFE_SB_TimeStampMsg(&tlm_joint_state.TlmHeader.Msg);
- 
-     // Send TELEMETRY back to ground (TransmitMsg)
-     // update_header: If true, the sequence counter bit in the primary header will increase each time
-     // If false, it will remain zero.
-     bool update_header = true;
-     CFE_SB_TransmitMsg(&tlm_joint_state.TlmHeader.Msg, update_header);      
+      OS_printf("  mbs     : %f\n", tlm_js_mbs.mbs_joint_state);
+
+      // If data received from robot update telemetry data
+     // to send back to ground
+      const bool update_header = true;
+
+      CFE_SB_TimeStampMsg(&tlm_js_canadarm.TlmHeader.Msg);
+      CFE_SB_TransmitMsg(&tlm_js_canadarm.TlmHeader.Msg, update_header);
+
+      CFE_SB_TimeStampMsg(&tlm_js_dextre.TlmHeader.Msg);
+      CFE_SB_TransmitMsg(&tlm_js_dextre.TlmHeader.Msg, update_header);
+
+      CFE_SB_TimeStampMsg(&tlm_js_mbs.TlmHeader.Msg);
+      CFE_SB_TransmitMsg(&tlm_js_mbs.TlmHeader.Msg, update_header);
+
+      CFE_SB_TimeStampMsg(&tlm_js_solar.TlmHeader.Msg);
+      CFE_SB_TransmitMsg(&tlm_js_solar.TlmHeader.Msg, update_header);
     }
- 
+
     /*
     ** Get command execution counters...
     */
@@ -367,7 +389,7 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
     EdorasAppData.HkTlm.Payload.CommandCounter      = EdorasAppData.CmdCounter++;
 
     OS_printf("EdorasAppReportHousekeeping reporting: %d\n", EdorasAppData.HkTlm.Payload.CommandCounter);
- 
+
     CFE_SB_TimeStampMsg(&EdorasAppData.HkTlm.TlmHeader.Msg);
     CFE_SB_TransmitMsg(&EdorasAppData.HkTlm.TlmHeader.Msg, true);
 
@@ -390,8 +412,8 @@ int32 EdorasAppNoop(const EdorasAppNoopCmd_t *Msg)
  * @brief Not used in this example
  */
 void HighRateControlLoop(void) {
-        
-    // 2. Update the telemetry information        
+
+    // 2. Update the telemetry information
     //EdorasAppOdometry_t *st = &lastOdomMsg; //EdorasAppGoal.StateTlm;
 
     /*EdorasAppData.HkTlm.Payload.state.pose.x = st->pose.x;
@@ -400,16 +422,16 @@ void HighRateControlLoop(void) {
     EdorasAppData.HkTlm.Payload.state.twist.linear_x = st->twist.linear_x;
     EdorasAppData.HkTlm.Payload.state.twist.linear_y = st->twist.linear_y;*/
 
-    // This data is sent when a Housekeeping request is received, 
+    // This data is sent when a Housekeeping request is received,
     // (usually, at a low rate) so nothing sent here
     //memcpy(&st->joints, &EdorasAppData.HkTlm.Payload.state, sizeof(EdorasAppSSRMS_t) );
-    
+
 }
 
-/*                                                                            
+/*
  * @function EdorasAppVerifyCmdLength
  * @brief Verify command packet length
- */ 
+ */
 bool EdorasAppVerifyCmdLength(CFE_MSG_Message_t *MsgPtr, size_t ExpectedLength)
 {
     bool              result       = true;
