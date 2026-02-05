@@ -30,7 +30,7 @@
 #endif
 
 // Code that creates a socket and sends information from cFS to the robot
-#include "robot_comm_udp_mobile_servicing_system.h"
+#include "robot_comm_udp_lunar_exploration.h"
 
 // Global data
 EdorasAppData_t EdorasAppData;
@@ -39,27 +39,25 @@ CommData_t commData;
 typedef struct
 {
     CFE_MSG_TelemetryHeader_t  TlmHeader;
-    float joints_canadarm[7];
-    float joints_dextre_arm_1[6];
-    float joints_dextre_arm_2[6];
-    float joint_dextre_body;
-    float joint_mbs;
-    float port_bga[4];
-    float port_sarj;
-    float starboard_bga[4];
-    float starboard_sarj;
-    
+    float joints[17];
+    float x;
+    float y;
+    float z;
+    float qx;
+    float qy;
+    float qz;
+    float qw;    
 } JointStateData_t;
 
 typedef struct
 {
     CFE_MSG_CommandHeader_t  TlmHeader;
-    char group_state[30+30];
-    //char state[30];
-} GroupCommandData_t;
+    float val_1;
+    float val_2;
+} GenericCommandData_t;
 
 JointStateData_t tlm_joint_state;
-GroupCommandData_t cmd_group;
+GenericCommandData_t cmd_generic;
 
 void HighRateControlLoop(void);
 
@@ -252,6 +250,7 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
     CFE_MSG_GetFcnCode(&SBBufPtr->Msg, &CommandCode);
 
     // Process "known" Edoras App ground commands
+    OS_printf("Command code: %d !!!!!!!!!!!!!!!!!!!\n", CommandCode);
     switch (CommandCode)
     {
         case EDORAS_APP_NOOP_CC:
@@ -262,23 +261,28 @@ void EdorasAppProcessGroundCommand(CFE_SB_Buffer_t *SBBufPtr)
 
             break;
 
-        case EDORAS_APP_CMD_CC:
+        case EDORAS_APP_TWIST_CMD_CC:
         {
-            memcpy(&cmd_group, SBBufPtr, sizeof(cmd_group));
+            memcpy(&cmd_generic, SBBufPtr, sizeof(cmd_generic));
 
-            char group[30]; char state[30];
-            int end_group; int end_state;
-
-            getString(cmd_group.group_state, 60,  0, group, &end_group);
-            getString(cmd_group.group_state, 60, end_group + 1, state, &end_state);
-              
-            OS_printf("Cmd group pose: %s  , state: %s \n", group, state);
-
+            OS_printf("Cmd received: %f - %f \n", cmd_generic.val_1, cmd_generic.val_2);
         
             // Send data to robot using the socket
-            sendGroupCmd(&commData, group, state);
+            sendTwistCmd(&commData, cmd_generic.val_1, cmd_generic.val_2);
         }
              break;
+
+        case EDORAS_APP_CAMERA_CMD_CC:
+        {
+            memcpy(&cmd_generic, SBBufPtr, sizeof(cmd_generic));
+
+            OS_printf("Camera joints received: %f - %f \n", cmd_generic.val_1, cmd_generic.val_2);
+        
+            // Send data to robot using the socket
+            sendCameraCmd(&commData, cmd_generic.val_1, cmd_generic.val_2);
+        }
+             break;
+
 
         /* default case already found during FC vs length test */
         default:
@@ -329,25 +333,22 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
      int32_t sec; uint32_t nanosec;
      
      if(!receiveJointStateTlm(&commData, 
-       tlm_joint_state.joints_canadarm, 
-       tlm_joint_state.joints_dextre_arm_1, 
-       tlm_joint_state.joints_dextre_arm_2, 
-       &tlm_joint_state.joint_dextre_body, 
-       &tlm_joint_state.joint_mbs, 
-       tlm_joint_state.port_bga, &tlm_joint_state.port_sarj, 
-       tlm_joint_state.starboard_bga, &tlm_joint_state.starboard_sarj, 
+       tlm_joint_state.joints, 
+       &tlm_joint_state.x, 
+       &tlm_joint_state.y, 
+       &tlm_joint_state.z, 
+       &tlm_joint_state.qx, 
+       &tlm_joint_state.qy, 
+       &tlm_joint_state.qz, 
+       &tlm_joint_state.qw,                                   
        &sec, &nanosec))
        return CFE_SUCCESS;
 
-     OS_printf("Size of tlm header: %ld, size of Tlm data size: %ld. data canadarm: %f %f %f %f %f %f %f \n", 
+     OS_printf("Size of tlm header: %ld, size of Tlm data size: %ld. data pose: %f %f %f -- %f %f %f %f \n", 
             sizeof(CFE_MSG_TelemetryHeader_t), sizeof(tlm_joint_state), 
-            tlm_joint_state.joints_canadarm[0], tlm_joint_state.joints_canadarm[1], tlm_joint_state.joints_canadarm[2], 
-            tlm_joint_state.joints_canadarm[3], tlm_joint_state.joints_canadarm[4], 
-            tlm_joint_state.joints_canadarm[5], tlm_joint_state.joints_canadarm[6]);
+            tlm_joint_state.x, tlm_joint_state.y, tlm_joint_state.z, 
+            tlm_joint_state.qx, tlm_joint_state.qy, tlm_joint_state.qz, tlm_joint_state.qw);
 
-     OS_printf("-- data joint mbs: %f \n", 
-            tlm_joint_state.joint_mbs); 
-       
      // If data received from robot update telemetry data
      // to send back to ground    
       CFE_SB_TimeStampMsg(&tlm_joint_state.TlmHeader.Msg);
@@ -356,7 +357,7 @@ int32 EdorasAppReportHousekeeping(const CFE_MSG_CommandHeader_t *Msg)
      // update_header: If true, the sequence counter bit in the primary header will increase each time
      // If false, it will remain zero.
      bool update_header = true;
-     CFE_SB_TransmitMsg(&tlm_joint_state.TlmHeader.Msg, update_header);      
+     CFE_SB_TransmitMsg(&tlm_joint_state.TlmHeader.Msg, update_header);
     }
  
     /*

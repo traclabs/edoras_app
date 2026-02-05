@@ -34,8 +34,8 @@
  * EdorasApp command codes
  */
 #define EDORAS_APP_NOOP_CC        0
-#define EDORAS_APP_CMD_CC         1
-
+#define EDORAS_APP_TWIST_CMD_CC         1
+#define EDORAS_APP_CAMERA_CMD_CC        2
 /*************************************************************************/
 
 /*

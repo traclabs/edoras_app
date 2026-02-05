@@ -1,5 +1,5 @@
-#ifndef __ROBOT_COMM_UDP_MOBILE_SERVICING_SYSTEM_H__
-#define __ROBOT_COMM_UDP_MOBILE_SERVICING_SYSTEM_H__
+#ifndef __ROBOT_COMM_UDP_LUNAR_EXPLORATION_H__
+#define __ROBOT_COMM_UDP_LUNAR_EXPLORATION_H__
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -19,13 +19,12 @@ typedef struct
 
 bool setupComm( CommData_t* _cd, int _cfs_port, int _robot_port, const char* _cfs_ip, const char* _robot_ip);
 bool sendPoseCmd( CommData_t* _cd, float _pos[3], float _rot[4]);
-bool sendGroupCmd( CommData_t* _cd, char _group[30], char _state[30]);
+bool sendTwistCmd( CommData_t* _cd, float _vlin, float _vang);
+bool sendCameraCmd( CommData_t* _cd, float _j1, float _j2);
+
 bool receiveJointStateTlm(CommData_t* _cd, 
-  float _js_canadarm[7], 
-  float _js_dextre_arm_1[6], float _js_dextre_arm_2[6], float* _js_dextre_body,
-  float* _js_mbs,
-  float _port_bga[4], float* _port_sarj,
-  float _starboard_bga[4], float* _starboard_sarj,
+  float _joints[17], 
+  float* _x, float* _y, float* _z, float* _qx, float* _qy,float* _qz,float* _qw, 
   int32_t* _sec, uint32_t* _nanosec);
 
-#endif // __ROBOT_COMM_UDP_ROVER_H__
+#endif // __ROBOT_COMM_UDP_LUNAR_EXPLORATION_H__
