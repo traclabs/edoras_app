@@ -32,12 +32,12 @@
 
 #include "cfe_msgids.h"
 
-#define EDORAS_APP_CMD_MID     (CFE_PLATFORM_CMD_MID_BASE + 0x27)
-#define EDORAS_APP_SEND_HK_MID (CFE_PLATFORM_CMD_MID_BASE + 0x28)
+#define EDORAS_APP_CMD_MID     0x1827
+#define EDORAS_APP_SEND_HK_MID 0x1828
 
-#define EDORAS_APP_HK_TLM_MID      (CFE_PLATFORM_TLM_MID_BASE + 0x26)
-#define EDORAS_APP_TLM_MID   (CFE_PLATFORM_TLM_MID_BASE + 0x27)
-#define EDORAS_APP_HR_CONTROL_MID  (CFE_PLATFORM_TLM_MID_BASE + 0x28)
+#define EDORAS_APP_HK_TLM_MID     0x0826
+#define EDORAS_APP_TLM_MID        0x0827
+#define EDORAS_APP_HR_CONTROL_MID 0x0828
 #endif /* _edoras_app_msgids_h_ */
 
 /*********************************/
